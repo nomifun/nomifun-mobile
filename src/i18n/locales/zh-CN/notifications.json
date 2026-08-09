@@ -1,1 +1,15 @@
-{}
+{
+  "sessionDone": "会话回复完成",
+  "sessionDoneBody": "「{{name}}」已完成回复",
+  "sessionError": "会话出错",
+  "sessionErrorBody": "「{{name}}」执行出错，请查看",
+  "taskDone": "定时任务完成",
+  "taskDoneBody": "任务「{{name}}」已执行",
+  "taskFailed": "定时任务失败",
+  "taskFailedBody": "任务「{{name}}」执行失败",
+  "requirementDone": "需求已完成",
+  "requirementDoneBody": "需求「{{name}}」已完成",
+  "requirementFailed": "需求执行失败",
+  "requirementFailedBody": "需求「{{name}}」执行失败",
+  "permissionNeeded": "需要通知权限才能接收完成提醒"
+}

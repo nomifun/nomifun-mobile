@@ -1,1 +1,15 @@
-{}
+{
+  "sessionDone": "Reply finished",
+  "sessionDoneBody": "“{{name}}” finished replying",
+  "sessionError": "Session error",
+  "sessionErrorBody": "“{{name}}” hit an error",
+  "taskDone": "Scheduled task finished",
+  "taskDoneBody": "Task “{{name}}” has run",
+  "taskFailed": "Scheduled task failed",
+  "taskFailedBody": "Task “{{name}}” failed",
+  "requirementDone": "Requirement done",
+  "requirementDoneBody": "Requirement “{{name}}” is done",
+  "requirementFailed": "Requirement failed",
+  "requirementFailedBody": "Requirement “{{name}}” failed",
+  "permissionNeeded": "Notification permission is needed for completion alerts"
+}

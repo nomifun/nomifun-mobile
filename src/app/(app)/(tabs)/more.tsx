@@ -1,12 +1,14 @@
-import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Platform, StyleSheet, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
 import { logout } from '@/api/auth';
-import { Avatar, Button, Card, ListRow, Screen, SectionTitle } from '@/components/ui';
+import { Avatar, Button, Card, ListRow, Screen, SectionTitle, toast } from '@/components/ui';
 import { FontSize, Spacing } from '@/constants/theme';
+import { notificationService } from '@/features/notifications/service';
 import { useConnection } from '@/hooks/use-connection';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -15,6 +17,13 @@ export default function MoreScreen() {
   const { t } = useTranslation('settings');
   const { t: tc } = useTranslation('connect');
   const connection = useConnection();
+  const [notifyOn, setNotifyOn] = useState(notificationService.isEnabled());
+
+  const toggleNotifications = async (next: boolean) => {
+    const effective = await notificationService.setEnabled(next);
+    setNotifyOn(effective);
+    if (next && !effective) toast.error(t('permissionNeeded', { ns: 'notifications' }));
+  };
 
   const binding = connection.phase === 'connected' ? connection.binding : null;
   const username = binding?.user?.username ?? '—';
@@ -60,6 +69,20 @@ export default function MoreScreen() {
         left={<Ionicons name="headset-outline" size={22} color={colors.primary} />}
         chevron
         onPress={() => router.push('/customer-service')}
+      />
+
+      <SectionTitle>{t('notifications')}</SectionTitle>
+      <ListRow
+        title={t('notificationsEnable')}
+        subtitle={t('notificationsHint')}
+        left={<Ionicons name="notifications-outline" size={22} color={colors.primary} />}
+        right={
+          <Switch
+            value={notifyOn}
+            onValueChange={(v) => void toggleNotifications(v)}
+            trackColor={{ true: colors.primary }}
+          />
+        }
       />
 
       <SectionTitle>{t('about')}</SectionTitle>

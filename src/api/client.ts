@@ -22,6 +22,8 @@ const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export interface RequestOptions {
   method?: string;
   body?: unknown;
+  /** Extra headers (e.g. Idempotency-Key on message send). */
+  headers?: Record<string, string>;
   /** Override the binding (used by the login flow before a binding exists). */
   baseUrl?: string;
   token?: string;
@@ -45,7 +47,7 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
   const csrfToken = opts.csrfToken ?? binding?.csrfToken;
   const method = (opts.method ?? (opts.body !== undefined ? 'POST' : 'GET')).toUpperCase();
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   if (csrfToken) {
@@ -91,7 +93,14 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
   if (res.status === 403) {
     const body = (json ?? {}) as { code?: string; error?: string; message?: string };
     const msg = body.error ?? body.message ?? '';
-    if (body.code === 'FORBIDDEN' && /token|authentication|user not found/i.test(msg)) {
+    // Auth-expiry messages: "Invalid or expired token" / "Authentication
+    // required" / "User not found". A CSRF rejection also mentions "token"
+    // ("CSRF token validation failed") but must NOT log the user out.
+    const isAuthExpired =
+      body.code === 'FORBIDDEN' &&
+      !/csrf/i.test(msg) &&
+      /invalid or expired token|authentication required|user not found/i.test(msg);
+    if (isAuthExpired) {
       connectionStore.markAuthExpired();
       throw new AuthExpiredError(msg);
     }
@@ -108,10 +117,10 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
 
 /** Request an /api/* endpoint and unwrap the `{success,data,message}` envelope. */
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const envelope = await rawRequest<ApiEnvelope<T>>(path, opts);
+  const envelope = await rawRequest<ApiEnvelope<T> & { error?: string }>(path, opts);
   if (envelope && typeof envelope === 'object' && 'success' in envelope) {
     if (!envelope.success) {
-      throw new ApiError(envelope.message ?? 'Request failed', 200);
+      throw new ApiError(envelope.message ?? envelope.error ?? 'Request failed', 200);
     }
     return envelope.data as T;
   }

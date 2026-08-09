@@ -14,6 +14,7 @@ import { connectionStore } from '@/api/connection';
 import { apiFetcher } from '@/api/client';
 import { nomifunSocket } from '@/api/ws';
 import { ToastHost } from '@/components/ui';
+import { notificationService } from '@/features/notifications/service';
 import { useConnection } from '@/hooks/use-connection';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -35,8 +36,13 @@ export default function RootLayout() {
   const connected = connection.phase === 'connected';
 
   useEffect(() => {
-    if (connected) nomifunSocket.start();
-    else nomifunSocket.stop();
+    if (connected) {
+      nomifunSocket.start();
+      void notificationService.start();
+    } else {
+      nomifunSocket.stop();
+      notificationService.stop();
+    }
   }, [connected]);
 
   if (connection.phase === 'loading') return null;
