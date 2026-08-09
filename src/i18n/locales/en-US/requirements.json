@@ -1,1 +1,107 @@
-{}
+{
+  "status": {
+    "pending": "Pending",
+    "in_progress": "Running",
+    "needs_review": "Needs review",
+    "done": "Done",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "filter": {
+    "all": "All",
+    "allTags": "All tags"
+  },
+  "list": {
+    "new": "New requirement",
+    "attempt": "Attempt {{count}}",
+    "empty": "No requirements yet",
+    "emptyHint": "Add one — each tag is a queue the desktop works through once auto-run is on.",
+    "emptyFiltered": "Nothing matches this filter",
+    "emptyFilteredHint": "Try another status or tag.",
+    "clearFilters": "Clear filters",
+    "loadMore": "Load more",
+    "loadedAll": "All {{count}} shown",
+    "tooMany": "Showing the latest {{count}} — see the rest on desktop",
+    "wsOffline": "Live updates are offline — pull to refresh"
+  },
+  "paused": {
+    "title": "Tag “{{tag}}” is paused",
+    "titleMany": "{{count}} tags are paused",
+    "reason": "Reason: {{reason}}",
+    "hint": "This queue stopped running automatically — resume it on the desktop.",
+    "reasons": {
+      "requirement_failed": "a requirement ran out of retries",
+      "manual": "paused manually"
+    }
+  },
+  "detail": {
+    "title": "Requirement",
+    "content": "Instruction",
+    "contentEmpty": "(no content)",
+    "note": "Completion report",
+    "meta": "Details",
+    "actions": "Actions",
+    "attempts": "Attempts",
+    "attemptsValue": "{{count}}",
+    "orderKey": "Queue key",
+    "startedAt": "Started",
+    "completedAt": "Completed",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "createdByUser": "created by you",
+    "createdByAgent": "created by an agent",
+    "owner": "Runner",
+    "openSession": "Open chat",
+    "terminalOwner": "Run by a terminal",
+    "terminalHint": "Terminal runs are only visible on the desktop",
+    "attachments": "Attachments",
+    "attachmentsHint": "Image attachments open on the desktop",
+    "inProgressHint": "Running now — the desktop auto-run loop owns this status.",
+    "frozenHint": "Finished requirements are frozen; create a new one to run it again.",
+    "notFound": "This requirement no longer exists"
+  },
+  "actions": {
+    "complete": "Mark done",
+    "fail": "Mark failed",
+    "cancel": "Cancel requirement",
+    "requeue": "Put back in queue",
+    "editInfo": "Edit",
+    "delete": "Delete requirement",
+    "confirmComplete": "Confirm done",
+    "confirmFail": "Confirm failure"
+  },
+  "note": {
+    "completeLabel": "Completion note (optional)",
+    "completePlaceholder": "What got done…",
+    "failLabel": "Failure reason (optional)",
+    "failPlaceholder": "What went wrong…"
+  },
+  "confirm": {
+    "cancelTitle": "Cancel this requirement?",
+    "cancelMessage": "Once cancelled it cannot move to another status.",
+    "cancelConfirm": "Cancel it",
+    "deleteMessage": "“{{title}}” will be deleted permanently."
+  },
+  "form": {
+    "createTitle": "New requirement",
+    "titleLabel": "Title",
+    "titlePlaceholder": "One line: what needs doing",
+    "titleRequired": "Title is required",
+    "tagLabel": "Tag",
+    "tagPlaceholder": "e.g. web, backend, chores",
+    "tagRequired": "Tag is required",
+    "tagHint": "A tag is the execution queue — new ones are created on first use.",
+    "tagSuggestions": "Existing tags",
+    "contentLabel": "Instruction",
+    "contentPlaceholder": "Spell out the work and what done looks like…",
+    "contentHint": "This text is handed to the agent verbatim.",
+    "createHint": "It starts as Pending and runs when the desktop auto-run loop picks up the queue.",
+    "submit": "Create requirement",
+    "created": "Requirement created"
+  },
+  "feedback": {
+    "statusChanged": "Status updated",
+    "completed": "Marked done",
+    "requeued": "Back in the queue"
+  }
+}

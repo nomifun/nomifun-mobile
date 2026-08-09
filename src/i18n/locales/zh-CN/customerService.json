@@ -1,1 +1,143 @@
-{}
+{
+  "title": "客服",
+  "subtitle": "面向陌生访客的客服员工 —— 只依据知识库与客服笔记回答，高危能力从不注册。",
+  "status": {
+    "enabled": "服务中",
+    "disabled": "已停用"
+  },
+  "trust": {
+    "lead": "安全边界固定，不因配置放宽",
+    "readonly": "仅三个只读工具：知识检索 / 知识阅读 / 客服笔记",
+    "locked": "终端 / 文件 / 电脑 / 浏览器 等高危能力从不注册"
+  },
+  "card": {
+    "noModel": "未配置模型",
+    "kbCount": "{{count}} 个知识库"
+  },
+  "roster": {
+    "count": "共 {{count}} 位客服"
+  },
+  "tabs": {
+    "config": "配置",
+    "notes": "笔记",
+    "dialogues": "对话"
+  },
+  "sections": {
+    "identity": "身份与话术",
+    "modelKnowledge": "模型与知识库",
+    "bindings": "渠道机器人",
+    "notes": "客服笔记",
+    "danger": "危险操作"
+  },
+  "create": {
+    "action": "创建客服",
+    "title": "创建客服",
+    "hint": "先起个名字，其余稍后配置",
+    "defaultsHint": "创建后可继续设置模型、知识库、话术与并发上限。",
+    "done": "客服已创建"
+  },
+  "empty": {
+    "title": "还没有客服",
+    "desc": "创建一位客服，挂上知识库与服务策略，再在桌面端把渠道机器人绑给它，让它安全地接待访客。",
+    "action": "创建第一位客服"
+  },
+  "fields": {
+    "name": "名称",
+    "namePlaceholder": "例如：售后小助",
+    "nameRequired": "请输入客服名称",
+    "provider": "模型服务商",
+    "providerPlaceholder": "选择服务商",
+    "providerSheetHint": "只列出有对话模型的服务商",
+    "providerMissing": "服务商已不存在",
+    "clearProvider": "不配置模型",
+    "noProviders": "还没有可用的服务商，请先在「模型管理」中添加。",
+    "modelCount": "{{count}} 个可用模型",
+    "model": "对话模型",
+    "modelPlaceholder": "选择模型",
+    "modelNeedsProvider": "请先选择服务商",
+    "noModels": "该服务商暂无可用的对话模型",
+    "knowledgeBases": "知识库",
+    "knowledgeBaseMissing": "知识库已删除",
+    "noKnowledgeBases": "还没有知识库，请在桌面端创建。",
+    "fileCount": "{{count}} 个文件",
+    "knowledgeFootnote": "客服只能检索这里挂载的知识库，以及已启用的客服笔记。",
+    "greeting": "问候语",
+    "greetingPlaceholder": "访客打招呼时的开场白",
+    "persona": "人设话术",
+    "personaPlaceholder": "语气与人设，例如：耐心、简洁、以事实为准",
+    "servicePolicy": "服务策略",
+    "servicePolicyHint": "会写入系统提示词，约束回答边界",
+    "servicePolicyPlaceholder": "业务范围 / 禁答话题 / 合规话术",
+    "maxConcurrent": "并发上限",
+    "maxConcurrentHint": "同时接待的访客数（1–64）；同一访客始终串行"
+  },
+  "detail": {
+    "enabled": "启用",
+    "enabledHint": "正在接待绑定机器人上的访客",
+    "disabledHint": "已停用，不再接待新访客",
+    "saved": "已保存",
+    "revert": "撤销",
+    "delete": "删除客服",
+    "deleteConfirm": "删除该客服后，其渠道绑定、访客对话与私有笔记将一并删除，不可恢复。",
+    "deleted": "客服已删除",
+    "notFound": "客服不存在或已删除",
+    "knowledgeBasesPlaceholder": "选择挂载知识库",
+    "knowledgeBasesMountedCount": "已挂载 {{count}} 个"
+  },
+  "bots": {
+    "domainHint": "客服使用自己的渠道机器人，与桌面伙伴的渠道相互独立。",
+    "groupBound": "已绑定本客服",
+    "groupPool": "其他客服域机器人",
+    "boundToThis": "本客服",
+    "boundToOther": "已绑客服：{{name}}",
+    "otherAgent": "其他客服",
+    "unbound": "未绑定",
+    "noBots": "还没有客服渠道机器人 —— 请在桌面端创建。",
+    "noneBoundHere": "本客服还没有绑定机器人，访客暂时进不来。",
+    "desktopOnly": "新建、绑定与解绑请在桌面端操作。绑定后，该机器人的来访消息全部交给这位客服（陌生访客免配对码）。",
+    "status": {
+      "connected": "已连接",
+      "connecting": "连接中",
+      "disabled": "已停用",
+      "noToken": "未配置凭证"
+    }
+  },
+  "notes": {
+    "add": "新增笔记",
+    "count": "共 {{count}} 条笔记",
+    "emptyTitle": "还没有笔记",
+    "empty": "FAQ、话术、业务事实都可以放在这里，客服只读引用，不会执行。",
+    "createHint": "客服只读引用这些内容作答",
+    "kind": "类型",
+    "kind_faq": "FAQ",
+    "kind_script": "话术",
+    "kind_fact": "业务事实",
+    "content": "内容",
+    "contentPlaceholder": "写下 FAQ / 话术 / 业务事实…",
+    "contentRequired": "笔记内容不能为空",
+    "shared": "共享",
+    "private": "私有",
+    "sharedHint": "共享给全部客服（不勾选则仅本客服可用）",
+    "scopeLocked": "范围创建后不可修改",
+    "editTitle": "编辑笔记",
+    "tapToEdit": "点按编辑内容与类型",
+    "created": "笔记已创建",
+    "updated": "笔记已更新",
+    "deleted": "笔记已删除",
+    "deleteConfirm": "删除该笔记？客服将不再引用它。"
+  },
+  "dialogues": {
+    "pollHint": "客服对话没有实时推送，下拉或重新进入本页刷新。",
+    "emptyTitle": "还没有访客对话",
+    "emptyHint": "绑定的渠道机器人收到陌生访客消息后，会话会出现在这里。",
+    "visitor": "访客 {{id}}",
+    "lastActivity": "最近活动 {{time}}",
+    "stateOpen": "进行中",
+    "stateClosed": "已结束",
+    "messageCount": "{{count}} 条消息",
+    "roleVisitor": "访客",
+    "roleAgent": "客服",
+    "emptyTranscript": "这条对话还没有消息",
+    "emptyTranscriptHint": "访客发来消息后会出现在这里。"
+  }
+}

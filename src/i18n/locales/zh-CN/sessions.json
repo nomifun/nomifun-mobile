@@ -1,1 +1,78 @@
-{}
+{
+  "list": {
+    "title": "会话",
+    "emptyTitle": "还没有会话",
+    "emptyHint": "点右上角的「+」开一个新会话，桌面端的智能体会在这里回应你。",
+    "loadFailed": "会话列表加载失败",
+    "loadingMore": "正在加载更多…",
+    "noMore": "没有更多会话了",
+    "pinned": "置顶",
+    "generating": "生成中",
+    "waiting": "待确认",
+    "untitled": "未命名会话",
+    "createFailed": "新建会话失败：{{message}}"
+  },
+  "create": {
+    "action": "新建会话",
+    "defaultName": "新会话"
+  },
+  "actions": {
+    "title": "会话操作",
+    "rename": "重命名",
+    "renameLabel": "会话名称",
+    "renamePlaceholder": "给这个会话起个名字",
+    "renamed": "已重命名",
+    "pin": "置顶会话",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "unpinned": "已取消置顶",
+    "delete": "删除会话",
+    "deleteConfirm": "删除后会话与全部消息都无法恢复，确认删除吗？",
+    "failed": "操作失败：{{message}}"
+  },
+  "detail": {
+    "title": "会话",
+    "emptyTitle": "开始对话",
+    "emptyHint": "在下方输入你的第一句话，智能体会实时把回复流式推送到这里。",
+    "loadFailed": "消息加载失败",
+    "loadOlder": "加载更早的消息",
+    "loadingOlder": "正在加载更早的消息…",
+    "historyStart": "已经是最早的消息",
+    "typing": "正在生成回复…",
+    "stopped": "已停止生成",
+    "cannotSend": "智能体正忙，请稍候再发送",
+    "desktopOnlyHint": "工作区、终端与审批等能力请在桌面端操作。"
+  },
+  "message": {
+    "thinking": "思考中…",
+    "thought": "思考过程",
+    "thoughtDuration": "思考了 {{seconds}} 秒",
+    "expand": "展开",
+    "collapse": "收起",
+    "tool": "工具",
+    "toolRunning": "执行中",
+    "toolSuccess": "已完成",
+    "toolError": "执行失败",
+    "toolPending": "等待中",
+    "toolCanceled": "已取消",
+    "toolConfirming": "待确认",
+    "noticeError": "出错了",
+    "noticeWarning": "提示",
+    "noticeSuccess": "完成",
+    "sending": "发送中…",
+    "sendFailedTag": "未发送"
+  },
+  "composer": {
+    "placeholder": "说点什么…",
+    "send": "发送",
+    "stop": "停止",
+    "sendFailed": "发送失败：{{message}}",
+    "stopFailed": "停止失败：{{message}}",
+    "stopRequested": "已请求停止"
+  },
+  "meta": {
+    "defaultModel": "默认模型",
+    "companion": "伙伴会话",
+    "summoned": "已召唤伙伴"
+  }
+}

@@ -1,1 +1,200 @@
-{}
+{
+  "title": "Desktop Companion",
+  "tabs": {
+    "overview": "Overview",
+    "memory": "Memory",
+    "settings": "Settings"
+  },
+  "roster": {
+    "count": "{{count}} companions",
+    "default": "Default",
+    "create": "New companion",
+    "emptyTitle": "No companions yet",
+    "emptyHint": "Create one here with a name and a character; models, knowledge bases and custom figures are still set up on the desktop.",
+    "loadFailed": "Failed to load the companion roster",
+    "wsReconnecting": "Reconnecting to the desktop",
+    "wsOffline": "Live connection lost"
+  },
+  "card": {
+    "level": "Lv{{level}} · {{name}}",
+    "memories": "{{count}} memories",
+    "modelMissing": "No model"
+  },
+  "characters": {
+    "mochi": {
+      "name": "Mochi",
+      "style": "Soft Japanese · mochi bunny"
+    },
+    "ink": {
+      "name": "Ink",
+      "style": "Eastern ink-wash · amber-eyed cat"
+    },
+    "bolt": {
+      "name": "Bolt",
+      "style": "Cozy tech · hovering robot"
+    },
+    "custom": {
+      "name": "Custom figure",
+      "style": "Your own uploaded figure"
+    }
+  },
+  "moods": {
+    "happy": "Happy",
+    "content": "Content",
+    "sleepy": "Sleepy",
+    "worried": "Worried",
+    "excited": "Excited"
+  },
+  "levels": {
+    "l1": "Getting to know you",
+    "l2": "Remembers you",
+    "l3": "Reminds you",
+    "l4": "Knows your rhythm",
+    "l5": "Anticipates you"
+  },
+  "kinds": {
+    "profile": "Profile",
+    "preference": "Preference",
+    "knowledge": "Knowledge",
+    "episode": "Episode",
+    "task": "Task thread",
+    "affective": "Affective"
+  },
+  "robotStatus": {
+    "offline": "Offline",
+    "idle": "Online",
+    "listening": "Listening",
+    "speaking": "Speaking"
+  },
+  "overview": {
+    "openChat": "Open chat",
+    "xpProgress": "{{xp}} / {{next}} XP",
+    "deskShown": "Shown on desktop",
+    "deskHidden": "Hidden on desktop",
+    "learning": "Learning…",
+    "chatModelMissingTitle": "No chat model configured",
+    "chatModelMissingBody": "Pick a chat model on the desktop under Desktop Companion → Overview → Model configuration, then you can chat from your phone.",
+    "statsTitle": "Growth",
+    "statMemories": "Active memories",
+    "statArchived": "Archived",
+    "statSkills": "Skills",
+    "statXp": "XP",
+    "learnTitle": "Learning",
+    "learnSchedule": "Scheduled learning",
+    "learnOn": "On · every {{minutes}} min",
+    "learnOff": "Off",
+    "learnRun": "Run a learning pass",
+    "learnDone": "Learning finished · {{count}} new memories",
+    "learnFailed": "Learning failed",
+    "learnHint": "A pass reviews recently collected events and distils memories and skills; collection toggles live on the desktop.",
+    "weeklyTitle": "Last 7 days",
+    "weeklySkills": "{{count}} new skills",
+    "weeklyMemories": "{{count}} new memories",
+    "modelsTitle": "Models",
+    "modelsHint": "Model configuration is done on the desktop.",
+    "modelMain": "Main chat",
+    "modelFallback": "Fallback",
+    "modelVision": "Vision",
+    "modelTts": "Text to speech",
+    "modelUnset": "Not set",
+    "skillsTitle": "Skills",
+    "skillsEmpty": "No skills yet",
+    "skillsFailed": "Failed to load skills",
+    "skillsUsage": "Used {{count}} times",
+    "skillsCount": "{{count}} skills in total — the full list and draft review are on the desktop.",
+    "skillStatus": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "robotsTitle": "Robots",
+    "robotsEmpty": "No robot bound yet",
+    "robotsFailed": "Failed to load robots",
+    "robotsHint": "Binding and unbinding are done on the desktop.",
+    "robotBoard": "Board {{board}}",
+    "robotLastSeen": "Last seen {{time}}",
+    "robotNeverSeen": "Never connected"
+  },
+  "memory": {
+    "searchPlaceholder": "Search memories…",
+    "filterAll": "All",
+    "statusActive": "Active",
+    "statusArchived": "Archived",
+    "compose": "Note something",
+    "total": "{{count}} in total",
+    "loadMore": "Load more ({{count}} left)",
+    "emptyTitle": "No memories yet",
+    "emptyHint": "Turn on collection and run a learning pass on the desktop, or just note something here.",
+    "emptyFilteredTitle": "No memories match",
+    "emptyFilteredHint": "Try another keyword or relax the filters.",
+    "loadFailed": "Failed to load memories",
+    "saveFailed": "Failed to save",
+    "detailTitle": "Memory detail",
+    "composeTitle": "Note something",
+    "composeKindHint": "The kind decides how this memory is weighted and decays during retrieval. It belongs to this companion only.",
+    "kindLabel": "Kind",
+    "contentLabel": "Content",
+    "contentPlaceholder": "What should it remember?",
+    "pinLabel": "Pinned",
+    "pinHint": "Pinned memories never decay and are always retrieved first.",
+    "archive": "Archive",
+    "restore": "Restore",
+    "archived": "Archived",
+    "restored": "Restored",
+    "deleteConfirmTitle": "Delete this memory?",
+    "deleteConfirmBody": "This memory is deleted permanently and cannot be recovered.",
+    "metaKind": "Kind",
+    "metaImportance": "Importance",
+    "metaSource": "Source",
+    "metaCreatedAt": "Created",
+    "metaUpdatedAt": "Updated"
+  },
+  "settings": {
+    "basicTitle": "Basics",
+    "nameLabel": "Name",
+    "nameHint": "What your companion is called — shown in chat and on the desktop companion",
+    "personaLabel": "Persona",
+    "persona": {
+      "lively": "Lively",
+      "calm": "Calm",
+      "sassy": "Sassy"
+    },
+    "personaHint": "Shapes how {{name}} talks",
+    "personaCustomLabel": "Extra notes",
+    "personaCustomPlaceholder": "Extra persona notes (optional), e.g. call me \"Captain\"",
+    "quietTitle": "Quiet hours",
+    "quietStart": "From",
+    "quietEnd": "To",
+    "quietHint": "It stays quiet during this window; overnight ranges work too (e.g. 23:00 to 08:00).",
+    "quietInvalid": "Use the HH:mm format",
+    "togglesTitle": "State",
+    "deskVisible": "Show on desktop",
+    "deskVisibleHint": "Show this companion on the desktop (transparent always-on-top window, desktop only)",
+    "learnEnabled": "Scheduled learning",
+    "learnEnabledHint": "Reviews recent events every {{minutes}} minutes and distils memories and skills",
+    "desktopOnlyTitle": "Do this on the desktop",
+    "desktopOnlyBody": "Figures and the figure library, model and voice configuration, knowledge-base bindings, skill draft review, and migration import/export are still desktop-only.",
+    "dangerTitle": "Danger zone",
+    "deleteHint": "Permanently delete “{{name}}” together with its memories, skills, growth progress and chat history.",
+    "delete": "Delete companion",
+    "deleteConfirmTitle": "Delete “{{name}}”?",
+    "deleteConfirmBody": "The settings, every memory, the skills, the growth progress and the chat history of “{{name}}” are all deleted permanently and cannot be recovered.",
+    "deleteConfirmOk": "Delete permanently",
+    "deleted": "Deleted “{{name}}”"
+  },
+  "create": {
+    "title": "New companion",
+    "nameLabel": "Name",
+    "namePlaceholder": "Give it a name…",
+    "characterLabel": "Character",
+    "submit": "Create",
+    "created": "{{name}} has arrived!",
+    "failed": "Failed to create",
+    "hint": "Name and character are all it takes; models, memories and knowledge bases can be filled in later on the desktop. Custom figures are made on the desktop."
+  },
+  "detail": {
+    "loadFailed": "Failed to load this companion",
+    "notFound": "Companion not found",
+    "notFoundHint": "It may have been deleted — go back to the roster."
+  }
+}

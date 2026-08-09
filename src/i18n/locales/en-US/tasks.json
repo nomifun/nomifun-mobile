@@ -1,1 +1,153 @@
-{}
+{
+  "hostAwakeHint": "Scheduled tasks only run while your desktop is awake",
+  "summary": "{{total}} tasks · {{active}} running",
+  "errorSummary": "{{errors}} tasks failed on their last run",
+  "searchPlaceholder": "Search tasks, prompts or schedules",
+  "nextRunShort": "Next {{time}}",
+  "filter": {
+    "all": "All",
+    "active": "Active",
+    "paused": "Paused"
+  },
+  "empty": {
+    "title": "No scheduled tasks yet",
+    "hint": "Create one to let an agent run on a schedule — a daily news digest, for example.",
+    "noResults": "No matching tasks",
+    "noResultsHint": "Try another keyword, or change the status filter above."
+  },
+  "status": {
+    "active": "Running",
+    "paused": "Paused",
+    "error": "Failing",
+    "manual": "Manual only"
+  },
+  "runStatus": {
+    "ok": "Success",
+    "error": "Failed",
+    "skipped": "Skipped",
+    "missed": "Missed",
+    "none": "Never ran"
+  },
+  "schedule": {
+    "manual": "Manual trigger only",
+    "everyMinute": "Every minute",
+    "hourly": "Every hour",
+    "dailyAt": "Daily at {{time}}",
+    "weekdaysAt": "Weekdays at {{time}}",
+    "weeklyAt": "Every {{day}} at {{time}}",
+    "everyMinutes": "Every {{minutes}} minutes",
+    "everySeconds": "Every {{seconds}} seconds",
+    "once": "Once at {{time}}",
+    "cronRaw": "Cron {{expr}}"
+  },
+  "weekday": {
+    "sun": "Sunday",
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday"
+  },
+  "freq": {
+    "daily9": "Daily 9:00",
+    "hourly": "Hourly",
+    "weekdays9": "Weekdays 9:00",
+    "weeklyMon9": "Mondays 9:00",
+    "manual": "Manual",
+    "custom": "Custom"
+  },
+  "actions": {
+    "new": "New task",
+    "runNow": "Run now",
+    "pause": "Pause task",
+    "resume": "Enable task",
+    "edit": "Edit",
+    "delete": "Delete task"
+  },
+  "detail": {
+    "title": "Task detail",
+    "notFound": "This task no longer exists",
+    "enabled": "Run on schedule",
+    "enabledHint": "When off it never fires automatically; you can still run it manually",
+    "manualOnlyHint": "This task has no schedule and can only be run manually",
+    "instructions": "Prompt",
+    "history": "Run history",
+    "historyHint": "The server keeps only the latest 7 runs, without duration or output",
+    "noHistory": "No runs recorded yet",
+    "lastError": "Last error",
+    "info": "Task info",
+    "schedule": "Repeats",
+    "expression": "Cron expression",
+    "nextRun": "Next run",
+    "lastRun": "Last run",
+    "lastResult": "Last result",
+    "runCount": "Total runs",
+    "runCountValue": "{{n}} runs",
+    "timezone": "Time zone",
+    "agent": "Agent",
+    "model": "Model",
+    "workspace": "Project",
+    "configOptions": "Launch options",
+    "executionMode": "Execution mode",
+    "conversation": "Bound chat",
+    "clearContext": "Clear context each run",
+    "createdAt": "Created",
+    "desktopHint": "Agent, model and project folder can only be changed on the desktop",
+    "never": "Never"
+  },
+  "mode": {
+    "new_conversation": "New chat each run",
+    "existing": "Continuing chat",
+    "newHint": "Every trigger starts a fresh chat; nothing carries over. Good for digests and independent checks.",
+    "existingHint": "Every trigger continues the same chat, so context and results accumulate.",
+    "immutable": "The execution mode cannot be changed after creation"
+  },
+  "form": {
+    "createTitle": "New scheduled task",
+    "editTitle": "Edit scheduled task",
+    "name": "Name",
+    "namePlaceholder": "Name this task",
+    "nameRequired": "Please enter a name",
+    "description": "Description",
+    "descriptionPlaceholder": "What is this task for? (optional)",
+    "prompt": "Prompt",
+    "promptPlaceholder": "e.g. Search today's AI news and write a short digest.",
+    "promptHint": "The agent only sees this text — make it a self-contained instruction.",
+    "promptRequired": "Please enter a prompt",
+    "frequency": "Frequency",
+    "cronExpr": "Cron expression",
+    "cronPlaceholder": "0 0 9 * * ?",
+    "cronHint": "Six fields: second minute hour day month weekday — same as the desktop.",
+    "nextRuns": "Upcoming runs",
+    "manualNote": "No schedule — it only runs when you tap Run now.",
+    "conversation": "Which chat should run it",
+    "conversationHint": "The task reuses that chat's agent, model and project folder, so there is nothing else to pick.",
+    "conversationRequired": "Please pick a chat",
+    "noConversations": "No chats available",
+    "noConversationsHint": "Start a chat first, or create the task on the desktop.",
+    "allBound": "Every chat is already taken by another task",
+    "allBoundHint": "A chat can only be bound to one continuing scheduled task.",
+    "scheduleLocked": "This task uses a schedule that cannot be edited on mobile ({{schedule}}); it will be kept as-is.",
+    "save": "Save",
+    "create": "Create task",
+    "cron": {
+      "invalid": "Invalid cron expression",
+      "unsupportedToken": "L / W / # are not supported — use * , - / ? and weekday names.",
+      "noUpcomingRun": "This expression has no upcoming run",
+      "subMinuteWarning": "Sub-minute tasks fire constantly and are very expensive; not recommended."
+    }
+  },
+  "feedback": {
+    "runQueued": "Task triggered",
+    "paused": "Task paused",
+    "resumed": "Task resumed",
+    "deleted": "Task deleted",
+    "created": "Task created",
+    "updated": "Task updated"
+  },
+  "confirmDelete": {
+    "title": "Delete scheduled task",
+    "message": "Delete this scheduled task? Every conversation it created will be deleted too."
+  }
+}

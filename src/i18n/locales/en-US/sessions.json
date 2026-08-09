@@ -1,1 +1,78 @@
-{}
+{
+  "list": {
+    "title": "Sessions",
+    "emptyTitle": "No sessions yet",
+    "emptyHint": "Tap “+” in the top right to start one — your desktop agent will reply right here.",
+    "loadFailed": "Could not load the session list",
+    "loadingMore": "Loading more…",
+    "noMore": "No more sessions",
+    "pinned": "Pinned",
+    "generating": "Generating",
+    "waiting": "Needs review",
+    "untitled": "Untitled session",
+    "createFailed": "Could not create the session: {{message}}"
+  },
+  "create": {
+    "action": "New session",
+    "defaultName": "New session"
+  },
+  "actions": {
+    "title": "Session actions",
+    "rename": "Rename",
+    "renameLabel": "Session name",
+    "renamePlaceholder": "Give this session a name",
+    "renamed": "Renamed",
+    "pin": "Pin session",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "unpinned": "Unpinned",
+    "delete": "Delete session",
+    "deleteConfirm": "The session and all of its messages will be gone for good. Delete it?",
+    "failed": "Action failed: {{message}}"
+  },
+  "detail": {
+    "title": "Session",
+    "emptyTitle": "Start the conversation",
+    "emptyHint": "Type your first message below — the reply streams in live.",
+    "loadFailed": "Could not load messages",
+    "loadOlder": "Load earlier messages",
+    "loadingOlder": "Loading earlier messages…",
+    "historyStart": "Beginning of the conversation",
+    "typing": "Generating a reply…",
+    "stopped": "Generation stopped",
+    "cannotSend": "The agent is busy — try again in a moment",
+    "desktopOnlyHint": "Workspace, terminal and approvals live on the desktop app."
+  },
+  "message": {
+    "thinking": "Thinking…",
+    "thought": "Reasoning",
+    "thoughtDuration": "Thought for {{seconds}}s",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "tool": "Tool",
+    "toolRunning": "Running",
+    "toolSuccess": "Done",
+    "toolError": "Failed",
+    "toolPending": "Queued",
+    "toolCanceled": "Canceled",
+    "toolConfirming": "Awaiting approval",
+    "noticeError": "Something went wrong",
+    "noticeWarning": "Notice",
+    "noticeSuccess": "Done",
+    "sending": "Sending…",
+    "sendFailedTag": "Not sent"
+  },
+  "composer": {
+    "placeholder": "Say something…",
+    "send": "Send",
+    "stop": "Stop",
+    "sendFailed": "Send failed: {{message}}",
+    "stopFailed": "Stop failed: {{message}}",
+    "stopRequested": "Stop requested"
+  },
+  "meta": {
+    "defaultModel": "Default model",
+    "companion": "Companion session",
+    "summoned": "Companion summoned"
+  }
+}

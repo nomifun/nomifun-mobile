@@ -1,1 +1,153 @@
-{}
+{
+  "hostAwakeHint": "定时任务仅在电脑（桌面端）唤醒状态下运行",
+  "summary": "{{total}} 个任务 · {{active}} 个运行中",
+  "errorSummary": "{{errors}} 个任务上次执行失败",
+  "searchPlaceholder": "搜索任务、指令或调度规则",
+  "nextRunShort": "下次 {{time}}",
+  "filter": {
+    "all": "全部",
+    "active": "已启动",
+    "paused": "已暂停"
+  },
+  "empty": {
+    "title": "暂无定时任务",
+    "hint": "新建一个定时任务，让 Agent 按计划自动执行，例如每天早上汇总一份资讯。",
+    "noResults": "没有匹配的定时任务",
+    "noResultsHint": "换个关键词，或切换上方的状态筛选。"
+  },
+  "status": {
+    "active": "运行中",
+    "paused": "已暂停",
+    "error": "执行出错",
+    "manual": "手动触发"
+  },
+  "runStatus": {
+    "ok": "成功",
+    "error": "失败",
+    "skipped": "已跳过",
+    "missed": "已错过",
+    "none": "未执行"
+  },
+  "schedule": {
+    "manual": "手动触发",
+    "everyMinute": "每分钟执行",
+    "hourly": "每小时执行",
+    "dailyAt": "每天 {{time}} 执行",
+    "weekdaysAt": "工作日 {{time}} 执行",
+    "weeklyAt": "每周{{day}} {{time}} 执行",
+    "everyMinutes": "每 {{minutes}} 分钟执行",
+    "everySeconds": "每 {{seconds}} 秒执行",
+    "once": "{{time}} 执行一次",
+    "cronRaw": "Cron {{expr}}"
+  },
+  "weekday": {
+    "sun": "日",
+    "mon": "一",
+    "tue": "二",
+    "wed": "三",
+    "thu": "四",
+    "fri": "五",
+    "sat": "六"
+  },
+  "freq": {
+    "daily9": "每天 9:00",
+    "hourly": "每小时",
+    "weekdays9": "工作日 9:00",
+    "weeklyMon9": "每周一 9:00",
+    "manual": "仅手动",
+    "custom": "自定义"
+  },
+  "actions": {
+    "new": "新建任务",
+    "runNow": "立即执行",
+    "pause": "暂停任务",
+    "resume": "启用任务",
+    "edit": "编辑",
+    "delete": "删除任务"
+  },
+  "detail": {
+    "title": "任务详情",
+    "notFound": "任务不存在或已被删除",
+    "enabled": "按计划执行",
+    "enabledHint": "关闭后不再自动触发，仍可手动执行",
+    "manualOnlyHint": "此任务没有调度计划，只能手动执行",
+    "instructions": "执行指令",
+    "history": "执行历史",
+    "historyHint": "服务端仅保留最近 7 次执行记录，且不记录耗时与输出",
+    "noHistory": "暂无执行记录",
+    "lastError": "上次错误",
+    "info": "任务信息",
+    "schedule": "重复执行",
+    "expression": "Cron 表达式",
+    "nextRun": "下次执行",
+    "lastRun": "上次执行",
+    "lastResult": "上次结果",
+    "runCount": "累计执行",
+    "runCountValue": "{{n}} 次",
+    "timezone": "时区",
+    "agent": "执行 Agent",
+    "model": "模型",
+    "workspace": "项目",
+    "configOptions": "启动参数",
+    "executionMode": "执行模式",
+    "conversation": "关联会话",
+    "clearContext": "每轮清空上下文",
+    "createdAt": "创建时间",
+    "desktopHint": "执行 Agent、模型与项目目录请在桌面端修改",
+    "never": "尚未执行"
+  },
+  "mode": {
+    "new_conversation": "新建会话",
+    "existing": "持续会话",
+    "newHint": "每次触发都会新建一个会话，上下文不会带到下一次执行。适合日报、巡检这类彼此独立的任务。",
+    "existingHint": "每次触发都会回到同一个会话继续执行，上下文和结果会持续保留。",
+    "immutable": "创建后无法更改执行模式"
+  },
+  "form": {
+    "createTitle": "新建定时任务",
+    "editTitle": "编辑定时任务",
+    "name": "名称",
+    "namePlaceholder": "输入任务名称",
+    "nameRequired": "请输入任务名称",
+    "description": "描述",
+    "descriptionPlaceholder": "简要描述任务用途（可选）",
+    "prompt": "执行指令",
+    "promptPlaceholder": "例如：搜索今天的 AI 新闻，汇总成一份简报。",
+    "promptHint": "Agent 只会看到这段文字，请写成可独立执行的完整指令。",
+    "promptRequired": "请输入执行指令",
+    "frequency": "频率",
+    "cronExpr": "Cron 表达式",
+    "cronPlaceholder": "0 0 9 * * ?",
+    "cronHint": "六段式：秒 分 时 日 月 星期，与桌面端一致。",
+    "nextRuns": "接下来将执行",
+    "manualNote": "不设置计划，仅在你点「立即执行」时运行。",
+    "conversation": "在哪个会话中执行",
+    "conversationHint": "定时任务会复用该会话的 Agent、模型与项目目录，因此手机端无需再选。",
+    "conversationRequired": "请选择一个会话",
+    "noConversations": "暂无可用会话",
+    "noConversationsHint": "请先在「会话」里开一个会话，或在桌面端新建定时任务。",
+    "allBound": "所有会话都已被其它定时任务占用",
+    "allBoundHint": "一个会话只能绑定一个持续执行的定时任务。",
+    "scheduleLocked": "该任务使用了手机端无法编辑的计划（{{schedule}}），保存时保持不变。",
+    "save": "保存",
+    "create": "创建任务",
+    "cron": {
+      "invalid": "无效的 Cron 表达式",
+      "unsupportedToken": "不支持 L / W / # 等高级符号，请使用 * , - / ? 与星期名。",
+      "noUpcomingRun": "该表达式没有将来的执行时间",
+      "subMinuteWarning": "秒级任务会高频触发，对系统开销极大，不建议配置。"
+    }
+  },
+  "feedback": {
+    "runQueued": "任务已触发执行",
+    "paused": "任务已暂停",
+    "resumed": "任务已恢复",
+    "deleted": "任务已删除",
+    "created": "任务创建成功",
+    "updated": "任务已更新"
+  },
+  "confirmDelete": {
+    "title": "删除定时任务",
+    "message": "确定要删除此定时任务吗？该任务下的所有会话也将被删除。"
+  }
+}

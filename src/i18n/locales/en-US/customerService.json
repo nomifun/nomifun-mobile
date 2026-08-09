@@ -1,1 +1,143 @@
-{}
+{
+  "title": "Customer service",
+  "subtitle": "Agents that serve strangers — answering only from knowledge bases and service notes. High-risk capabilities are never registered.",
+  "status": {
+    "enabled": "Serving",
+    "disabled": "Paused"
+  },
+  "trust": {
+    "lead": "A fixed safety boundary that configuration cannot widen",
+    "readonly": "Three read-only tools only: knowledge search / knowledge read / service notes",
+    "locked": "Terminal / files / computer / browser capabilities are never registered"
+  },
+  "card": {
+    "noModel": "No model configured",
+    "kbCount": "{{count}} knowledge bases"
+  },
+  "roster": {
+    "count": "{{count}} agents"
+  },
+  "tabs": {
+    "config": "Setup",
+    "notes": "Notes",
+    "dialogues": "Visitors"
+  },
+  "sections": {
+    "identity": "Identity & voice",
+    "modelKnowledge": "Model & knowledge",
+    "bindings": "Channel bots",
+    "notes": "Service notes",
+    "danger": "Danger zone"
+  },
+  "create": {
+    "action": "New agent",
+    "title": "New agent",
+    "hint": "Pick a name — configure the rest later",
+    "defaultsHint": "After creating you can set the model, knowledge bases, voice and concurrency ceiling.",
+    "done": "Agent created"
+  },
+  "empty": {
+    "title": "No agents yet",
+    "desc": "Create an agent, mount knowledge bases and a service policy, then bind a channel bot to it on the desktop so it can safely greet visitors.",
+    "action": "Create the first agent"
+  },
+  "fields": {
+    "name": "Name",
+    "namePlaceholder": "e.g. Support Assistant",
+    "nameRequired": "Please enter a name",
+    "provider": "Provider",
+    "providerPlaceholder": "Pick a provider",
+    "providerSheetHint": "Only providers with chat models are listed",
+    "providerMissing": "Provider no longer exists",
+    "clearProvider": "No model",
+    "noProviders": "No providers available — add one under Models first.",
+    "modelCount": "{{count}} models",
+    "model": "Chat model",
+    "modelPlaceholder": "Pick a model",
+    "modelNeedsProvider": "Pick a provider first",
+    "noModels": "This provider has no chat-capable model",
+    "knowledgeBases": "Knowledge bases",
+    "knowledgeBaseMissing": "Deleted knowledge base",
+    "noKnowledgeBases": "No knowledge bases yet — create one on the desktop.",
+    "fileCount": "{{count}} files",
+    "knowledgeFootnote": "The agent can only search the bases mounted here plus its enabled service notes.",
+    "greeting": "Greeting",
+    "greetingPlaceholder": "Opening line when a visitor says hello",
+    "persona": "Persona",
+    "personaPlaceholder": "Tone and persona, e.g. patient, concise, fact-first",
+    "servicePolicy": "Service policy",
+    "servicePolicyHint": "Goes into the system prompt and bounds the answers",
+    "servicePolicyPlaceholder": "Scope / off-limits topics / compliance phrasing",
+    "maxConcurrent": "Concurrency ceiling",
+    "maxConcurrentHint": "Visitors served at once (1–64); one visitor is always serial"
+  },
+  "detail": {
+    "enabled": "Enabled",
+    "enabledHint": "Serving visitors on the bound bots",
+    "disabledHint": "Paused — no new visitors are served",
+    "saved": "Saved",
+    "revert": "Revert",
+    "delete": "Delete agent",
+    "deleteConfirm": "Deleting this agent also deletes its channel bindings, visitor dialogues and private notes. This cannot be undone.",
+    "deleted": "Agent deleted",
+    "notFound": "This agent does not exist or was deleted",
+    "knowledgeBasesPlaceholder": "Pick knowledge bases to mount",
+    "knowledgeBasesMountedCount": "{{count}} mounted"
+  },
+  "bots": {
+    "domainHint": "Customer service has its own channel bots, fully separate from companion channels.",
+    "groupBound": "Bound to this agent",
+    "groupPool": "Other customer-service bots",
+    "boundToThis": "This agent",
+    "boundToOther": "Bound to {{name}}",
+    "otherAgent": "another agent",
+    "unbound": "Unbound",
+    "noBots": "No customer-service bots yet — create one on the desktop.",
+    "noneBoundHere": "No bot is bound to this agent, so visitors cannot reach it.",
+    "desktopOnly": "Create, bind and unbind on the desktop. Once bound, every visitor message on that bot goes to this agent (strangers need no pairing code).",
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting",
+      "disabled": "Disabled",
+      "noToken": "No credentials"
+    }
+  },
+  "notes": {
+    "add": "New note",
+    "count": "{{count}} notes",
+    "emptyTitle": "No notes yet",
+    "empty": "FAQs, scripts and business facts live here. The agent quotes them read-only and never executes them.",
+    "createHint": "The agent quotes these read-only when answering",
+    "kind": "Kind",
+    "kind_faq": "FAQ",
+    "kind_script": "Script",
+    "kind_fact": "Fact",
+    "content": "Content",
+    "contentPlaceholder": "Write an FAQ / script / business fact…",
+    "contentRequired": "Note content cannot be empty",
+    "shared": "Shared",
+    "private": "Private",
+    "sharedHint": "Share with every agent (unchecked = this agent only)",
+    "scopeLocked": "Scope cannot be changed after creation",
+    "editTitle": "Edit note",
+    "tapToEdit": "Tap to edit content and kind",
+    "created": "Note created",
+    "updated": "Note updated",
+    "deleted": "Note deleted",
+    "deleteConfirm": "Delete this note? The agent will stop quoting it."
+  },
+  "dialogues": {
+    "pollHint": "Customer-service dialogues are not pushed live — pull down or revisit this page to refresh.",
+    "emptyTitle": "No visitor dialogues yet",
+    "emptyHint": "Once a bound bot receives a message from a stranger, the dialogue shows up here.",
+    "visitor": "Visitor {{id}}",
+    "lastActivity": "Active {{time}}",
+    "stateOpen": "Open",
+    "stateClosed": "Closed",
+    "messageCount": "{{count}} messages",
+    "roleVisitor": "Visitor",
+    "roleAgent": "Agent",
+    "emptyTranscript": "No messages in this dialogue yet",
+    "emptyTranscriptHint": "Visitor messages will appear here."
+  }
+}

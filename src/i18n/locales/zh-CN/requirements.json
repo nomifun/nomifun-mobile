@@ -1,1 +1,107 @@
-{}
+{
+  "status": {
+    "pending": "待处理",
+    "in_progress": "进行中",
+    "needs_review": "待复核",
+    "done": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消"
+  },
+  "filter": {
+    "all": "全部",
+    "allTags": "全部标签"
+  },
+  "list": {
+    "new": "新建需求",
+    "attempt": "第 {{count}} 次尝试",
+    "empty": "还没有需求",
+    "emptyHint": "新建一条需求，桌面端打开自动执行后会按标签队列依次执行。",
+    "emptyFiltered": "没有符合条件的需求",
+    "emptyFilteredHint": "换个状态或标签再看看。",
+    "clearFilters": "清除筛选",
+    "loadMore": "加载更多",
+    "loadedAll": "已显示全部 {{count}} 条",
+    "tooMany": "仅显示最近 {{count}} 条，更多请在桌面端查看",
+    "wsOffline": "实时连接已断开，下拉可手动刷新"
+  },
+  "paused": {
+    "title": "标签「{{tag}}」已暂停",
+    "titleMany": "{{count}} 个标签已暂停自动执行",
+    "reason": "原因：{{reason}}",
+    "hint": "该队列已停止自动执行，请在桌面端恢复。",
+    "reasons": {
+      "requirement_failed": "有需求重试次数耗尽",
+      "manual": "手动暂停"
+    }
+  },
+  "detail": {
+    "title": "需求详情",
+    "content": "需求内容",
+    "contentEmpty": "（没有填写内容）",
+    "note": "完成记录",
+    "meta": "详情",
+    "actions": "操作",
+    "attempts": "尝试次数",
+    "attemptsValue": "{{count}} 次",
+    "orderKey": "队列序号",
+    "startedAt": "开始时间",
+    "completedAt": "完成时间",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间",
+    "createdByUser": "用户创建",
+    "createdByAgent": "智能体创建",
+    "owner": "执行方",
+    "openSession": "查看会话",
+    "terminalOwner": "由终端执行",
+    "terminalHint": "终端执行详情请在桌面端查看",
+    "attachments": "附件",
+    "attachmentsHint": "图片附件请在桌面端查看",
+    "inProgressHint": "正在执行中，状态由桌面端的自动执行流程控制。",
+    "frozenHint": "已结束的需求不能再改状态，需要重跑请新建一条。",
+    "notFound": "需求不存在或已被删除"
+  },
+  "actions": {
+    "complete": "标记完成",
+    "fail": "标记失败",
+    "cancel": "取消需求",
+    "requeue": "重新排队",
+    "editInfo": "编辑内容",
+    "delete": "删除需求",
+    "confirmComplete": "确认完成",
+    "confirmFail": "确认失败"
+  },
+  "note": {
+    "completeLabel": "完成记录（可选）",
+    "completePlaceholder": "写下这条需求的完成情况…",
+    "failLabel": "失败原因（可选）",
+    "failPlaceholder": "写下失败原因，方便之后排查…"
+  },
+  "confirm": {
+    "cancelTitle": "取消这条需求？",
+    "cancelMessage": "取消后不能再改成其他状态。",
+    "cancelConfirm": "确认取消",
+    "deleteMessage": "需求「{{title}}」将被永久删除。"
+  },
+  "form": {
+    "createTitle": "新建需求",
+    "titleLabel": "标题",
+    "titlePlaceholder": "一句话说清要做什么",
+    "titleRequired": "请填写标题",
+    "tagLabel": "标签",
+    "tagPlaceholder": "例如 web、后端、日常",
+    "tagRequired": "请填写标签",
+    "tagHint": "标签就是执行队列，第一次使用会自动创建。",
+    "tagSuggestions": "已有标签",
+    "contentLabel": "需求内容",
+    "contentPlaceholder": "写清楚要做什么、完成标准是什么…",
+    "contentHint": "这段内容会原样交给执行的智能体。",
+    "createHint": "创建后进入「待处理」，桌面端打开自动执行时会按队列执行。",
+    "submit": "创建需求",
+    "created": "需求已创建"
+  },
+  "feedback": {
+    "statusChanged": "状态已更新",
+    "completed": "已标记完成",
+    "requeued": "已重新排队"
+  }
+}

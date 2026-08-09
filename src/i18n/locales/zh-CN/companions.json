@@ -1,1 +1,200 @@
-{}
+{
+  "title": "桌面伙伴",
+  "tabs": {
+    "overview": "总览",
+    "memory": "记忆",
+    "settings": "设置"
+  },
+  "roster": {
+    "count": "{{count}} 位伙伴",
+    "default": "默认",
+    "create": "新建伙伴",
+    "emptyTitle": "还没有桌面伙伴",
+    "emptyHint": "先创建一个伙伴，给它名字和形象；模型、知识库和自定义形象仍需在桌面端配置。",
+    "loadFailed": "读取伙伴列表失败",
+    "wsReconnecting": "正在重连桌面端",
+    "wsOffline": "实时连接已断开"
+  },
+  "card": {
+    "level": "Lv{{level}} · {{name}}",
+    "memories": "记忆 {{count}}",
+    "modelMissing": "未配置模型"
+  },
+  "characters": {
+    "mochi": {
+      "name": "团子 Mochi",
+      "style": "软糯日系 · 麻薯兔"
+    },
+    "ink": {
+      "name": "墨墨 Ink",
+      "style": "东方水墨 · 琥珀眼黑猫"
+    },
+    "bolt": {
+      "name": "波特 Bolt",
+      "style": "软萌科技 · 悬浮机器人"
+    },
+    "custom": {
+      "name": "自定义形象",
+      "style": "你自己上传的形象图"
+    }
+  },
+  "moods": {
+    "happy": "开心",
+    "content": "平静",
+    "sleepy": "犯困",
+    "worried": "担心",
+    "excited": "兴奋"
+  },
+  "levels": {
+    "l1": "认识你",
+    "l2": "记得你",
+    "l3": "提醒你",
+    "l4": "懂你节奏",
+    "l5": "预判你"
+  },
+  "kinds": {
+    "profile": "画像",
+    "preference": "偏好",
+    "knowledge": "知识",
+    "episode": "事件",
+    "task": "任务线索",
+    "affective": "情感"
+  },
+  "robotStatus": {
+    "offline": "离线",
+    "idle": "在线",
+    "listening": "聆听中",
+    "speaking": "说话中"
+  },
+  "overview": {
+    "openChat": "打开聊天",
+    "xpProgress": "{{xp}} / {{next}} XP",
+    "deskShown": "桌面已显示",
+    "deskHidden": "桌面已隐藏",
+    "learning": "学习中…",
+    "chatModelMissingTitle": "还没有配置聊天模型",
+    "chatModelMissingBody": "请在桌面端「桌面伙伴 → 总览 → 模型配置」里为它选一个聊天模型，之后就能在手机上和它聊天。",
+    "statsTitle": "成长数据",
+    "statMemories": "有效记忆",
+    "statArchived": "已归档",
+    "statSkills": "技能",
+    "statXp": "成长值",
+    "learnTitle": "学习",
+    "learnSchedule": "定时学习",
+    "learnOn": "已开启 · 每 {{minutes}} 分钟",
+    "learnOff": "已关闭",
+    "learnRun": "立即学习一次",
+    "learnDone": "学习完成 · 新增记忆 {{count}} 条",
+    "learnFailed": "学习失败",
+    "learnHint": "学习会回顾最近采集到的事件，沉淀成记忆与技能；采集开关在桌面端。",
+    "weeklyTitle": "最近七天",
+    "weeklySkills": "新技能 {{count}}",
+    "weeklyMemories": "新记忆 {{count}}",
+    "modelsTitle": "模型",
+    "modelsHint": "模型配置请在桌面端完成。",
+    "modelMain": "主对话",
+    "modelFallback": "备用",
+    "modelVision": "视觉",
+    "modelTts": "语音合成",
+    "modelUnset": "未配置",
+    "skillsTitle": "技能",
+    "skillsEmpty": "还没有技能",
+    "skillsFailed": "读取技能失败",
+    "skillsUsage": "用过 {{count}} 次",
+    "skillsCount": "共 {{count}} 个技能，完整列表与草稿审阅在桌面端。",
+    "skillStatus": {
+      "draft": "草稿",
+      "active": "已启用",
+      "archived": "已归档"
+    },
+    "robotsTitle": "机器人",
+    "robotsEmpty": "还没有绑定机器人",
+    "robotsFailed": "读取机器人列表失败",
+    "robotsHint": "绑定与解绑请在桌面端完成。",
+    "robotBoard": "板型 {{board}}",
+    "robotLastSeen": "最近在线 {{time}}",
+    "robotNeverSeen": "还没连上过"
+  },
+  "memory": {
+    "searchPlaceholder": "搜索记忆…",
+    "filterAll": "全部",
+    "statusActive": "有效",
+    "statusArchived": "已归档",
+    "compose": "记一件事",
+    "total": "共 {{count}} 条",
+    "loadMore": "加载更多（还有 {{count}} 条）",
+    "emptyTitle": "还没有记忆",
+    "emptyHint": "在桌面端开启数据采集并跑一次学习，或者直接在这里记下一件事。",
+    "emptyFilteredTitle": "没有符合条件的记忆",
+    "emptyFilteredHint": "换个关键词或放宽筛选条件再看看。",
+    "loadFailed": "读取记忆失败",
+    "saveFailed": "保存失败",
+    "detailTitle": "记忆详情",
+    "composeTitle": "记一件事",
+    "composeKindHint": "分类决定这条记忆在检索时的权重与衰减方式；它只属于这个伙伴。",
+    "kindLabel": "分类",
+    "contentLabel": "内容",
+    "contentPlaceholder": "想让它记住什么？",
+    "pinLabel": "置顶",
+    "pinHint": "置顶的记忆不会随时间衰减，始终优先被检索到。",
+    "archive": "归档",
+    "restore": "恢复",
+    "archived": "已归档",
+    "restored": "已恢复",
+    "deleteConfirmTitle": "删除这条记忆？",
+    "deleteConfirmBody": "这条记忆会被永久删除，无法恢复。",
+    "metaKind": "分类",
+    "metaImportance": "重要度",
+    "metaSource": "来源",
+    "metaCreatedAt": "创建时间",
+    "metaUpdatedAt": "更新时间"
+  },
+  "settings": {
+    "basicTitle": "基础设定",
+    "nameLabel": "名字",
+    "nameHint": "伙伴的称呼，会出现在聊天与桌面伙伴里",
+    "personaLabel": "性格",
+    "persona": {
+      "lively": "活泼",
+      "calm": "沉稳",
+      "sassy": "小毒舌"
+    },
+    "personaHint": "决定 {{name}} 说话的性格与语气",
+    "personaCustomLabel": "补充设定",
+    "personaCustomPlaceholder": "补充人格设定（可选），例如：叫我「队长」",
+    "quietTitle": "安静时间",
+    "quietStart": "开始",
+    "quietEnd": "结束",
+    "quietHint": "这段时间里它不会主动开口，跨夜也可以（例如 23:00 到 08:00）。",
+    "quietInvalid": "请填写 HH:mm 格式的时间",
+    "togglesTitle": "状态",
+    "deskVisible": "桌面显示",
+    "deskVisibleHint": "在桌面上显示这只伙伴（透明置顶小窗，仅桌面端生效）",
+    "learnEnabled": "定时学习",
+    "learnEnabledHint": "每 {{minutes}} 分钟回顾一次最近的事件，沉淀成记忆与技能",
+    "desktopOnlyTitle": "需要在桌面端完成",
+    "desktopOnlyBody": "形象与形象库、模型与语音配置、知识库绑定、技能草稿审阅，以及迁移导入导出，仍然只在桌面端提供。",
+    "dangerTitle": "危险操作",
+    "deleteHint": "永久删除「{{name}}」，连同它的记忆、技能、成长进度与聊天记录。",
+    "delete": "删除伙伴",
+    "deleteConfirmTitle": "删除「{{name}}」？",
+    "deleteConfirmBody": "「{{name}}」的设定、全部记忆、技能、成长进度与聊天记录会一起永久删除，无法恢复。",
+    "deleteConfirmOk": "永久删除",
+    "deleted": "已删除「{{name}}」"
+  },
+  "create": {
+    "title": "新建伙伴",
+    "nameLabel": "名字",
+    "namePlaceholder": "给它起个名字…",
+    "characterLabel": "形象",
+    "submit": "创建",
+    "created": "{{name}} 来啦！",
+    "failed": "创建失败",
+    "hint": "名字和形象先定下来；模型、记忆和知识库可以之后在桌面端补齐。自定义形象需要在桌面端制作。"
+  },
+  "detail": {
+    "loadFailed": "读取伙伴失败",
+    "notFound": "找不到这个伙伴",
+    "notFoundHint": "它可能已经被删除了，返回列表看看吧。"
+  }
+}
