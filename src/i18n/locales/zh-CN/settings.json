@@ -1,0 +1,15 @@
+{
+  "server": "服务器",
+  "serverAddress": "地址",
+  "currentSite": "当前站点",
+  "features": "功能",
+  "models": "模型管理",
+  "customerService": "客服",
+  "notifications": "通知",
+  "notificationsEnable": "接收完成通知",
+  "notificationsHint": "会话回复完成、定时任务完成时通知",
+  "about": "关于",
+  "version": "版本",
+  "language": "语言",
+  "poweredBy": "由桌面端 Nomifun 提供服务"
+}

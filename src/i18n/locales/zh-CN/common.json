@@ -1,0 +1,56 @@
+{
+  "appName": "Nomifun",
+  "tabs": {
+    "sessions": "会话",
+    "tasks": "任务",
+    "requirements": "需求",
+    "companions": "伙伴",
+    "more": "我的"
+  },
+  "actions": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "创建",
+    "retry": "重试",
+    "refresh": "刷新",
+    "search": "搜索",
+    "done": "完成",
+    "close": "关闭",
+    "copy": "复制",
+    "back": "返回",
+    "more": "更多",
+    "enable": "启用",
+    "disable": "停用",
+    "send": "发送"
+  },
+  "state": {
+    "loading": "加载中…",
+    "empty": "暂无数据",
+    "error": "出错了",
+    "offline": "连接已断开",
+    "reconnecting": "重新连接中…",
+    "connected": "已连接",
+    "enabled": "已启用",
+    "disabled": "已停用"
+  },
+  "feedback": {
+    "saved": "已保存",
+    "deleted": "已删除",
+    "copied": "已复制",
+    "requestFailed": "请求失败",
+    "networkError": "网络错误，请检查与桌面端的连接"
+  },
+  "confirm": {
+    "deleteTitle": "确认删除",
+    "irreversible": "此操作不可撤销"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
+  }
+}

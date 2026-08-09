@@ -1,0 +1,15 @@
+{
+  "server": "Server",
+  "serverAddress": "Address",
+  "currentSite": "Current site",
+  "features": "Features",
+  "models": "Models",
+  "customerService": "Customer Service",
+  "notifications": "Notifications",
+  "notificationsEnable": "Completion notifications",
+  "notificationsHint": "Notify when replies and scheduled tasks finish",
+  "about": "About",
+  "version": "Version",
+  "language": "Language",
+  "poweredBy": "Powered by the Nomifun desktop"
+}

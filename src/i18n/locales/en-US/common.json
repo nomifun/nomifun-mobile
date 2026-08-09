@@ -1,0 +1,56 @@
+{
+  "appName": "Nomifun",
+  "tabs": {
+    "sessions": "Chats",
+    "tasks": "Tasks",
+    "requirements": "Work",
+    "companions": "Companions",
+    "more": "Me"
+  },
+  "actions": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "search": "Search",
+    "done": "Done",
+    "close": "Close",
+    "copy": "Copy",
+    "back": "Back",
+    "more": "More",
+    "enable": "Enable",
+    "disable": "Disable",
+    "send": "Send"
+  },
+  "state": {
+    "loading": "Loading…",
+    "empty": "Nothing here yet",
+    "error": "Something went wrong",
+    "offline": "Disconnected",
+    "reconnecting": "Reconnecting…",
+    "connected": "Connected",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "feedback": {
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "copied": "Copied",
+    "requestFailed": "Request failed",
+    "networkError": "Network error — check the connection to your desktop"
+  },
+  "confirm": {
+    "deleteTitle": "Delete?",
+    "irreversible": "This cannot be undone"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  }
+}
