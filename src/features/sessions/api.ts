@@ -173,10 +173,47 @@ export function fetchMessages(
   return api<Paginated<StoredMessage>>(messagesPath(conversationId, cursor, pageSize));
 }
 
+interface ModelRef {
+  provider_id: string;
+  model: string;
+}
+
+/**
+ * The server does NOT fall back to the global default at send time — a Nomi
+ * conversation created without a model rejects every message with
+ * "no provider/model configured". Mirror the desktop: resolve the default
+ * client-side and stamp it into the create payload.
+ */
+async function resolveDefaultChatModel(): Promise<ModelRef | undefined> {
+  try {
+    const map = await api<Record<string, unknown>>('/api/settings/client');
+    const saved = map?.['nomi.defaultModel'];
+    if (saved && typeof saved === 'object') {
+      const { provider_id, model } = saved as Record<string, unknown>;
+      if (typeof provider_id === 'string' && provider_id && typeof model === 'string' && model) {
+        return { provider_id, model };
+      }
+    }
+  } catch {
+    // fall through to task resolution
+  }
+  try {
+    const resolved = await api<{ models?: ModelRef[] }>('/api/model-profiles/resolve', {
+      body: { task: 'chat' },
+    });
+    const first = resolved?.models?.find((m) => m.provider_id && m.model);
+    if (first) return { provider_id: first.provider_id, model: first.model };
+  } catch {
+    // no model available — create without one; sends will surface the server hint
+  }
+  return undefined;
+}
+
 /** `type` + `extra` are required by the server; the id is minted server-side. */
-export function createConversation(name?: string): Promise<Conversation> {
+export async function createConversation(name?: string): Promise<Conversation> {
+  const model = await resolveDefaultChatModel();
   return api<Conversation>('/api/conversations', {
-    body: { type: 'nomi', name, extra: {} },
+    body: { type: 'nomi', name, ...(model ? { model } : {}), extra: {} },
   });
 }
 
