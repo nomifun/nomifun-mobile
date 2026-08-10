@@ -9,6 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import type { Conversation } from '../api';
 import { relativeTime } from '../time';
+import { isCompanionConversation, isProjectConversation } from '../workpath';
 
 interface SessionRowProps {
   conversation: Conversation;
@@ -38,14 +39,35 @@ export const SessionRow = memo(function SessionRow({
   const { t: tc } = useTranslation('common');
 
   const name = conversation.name?.trim() || t('list.untitled');
-  const isCompanion =
-    conversation.extra?.companion_session === true || conversation.extra?.companion_session === 1;
+  const isCompanion = isCompanionConversation(conversation);
+  /**
+   * A bound project directory. Marked with a folder badge on the avatar only:
+   * the enclosing section header already spells out the path, and a temporary
+   * (server-provisioned) workspace is not a project at all, so it gets nothing.
+   */
+  const isProject = isProjectConversation(conversation) && !isCompanion;
 
   return (
     <ListRow
       title={name}
       subtitle={modelLabel(conversation, t('meta.defaultModel'))}
-      left={<Avatar name={name} />}
+      left={
+        <View>
+          <Avatar name={name} />
+          {isProject ? (
+            <View
+              accessible
+              accessibilityLabel={t('meta.projectSession')}
+              style={[
+                styles.badge,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Ionicons name="folder" size={9} color={colors.primary} />
+            </View>
+          ) : null}
+        </View>
+      }
       onPress={onPress}
       onLongPress={onLongPress}
       chevron
@@ -77,4 +99,15 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end', gap: Spacing.xs, maxWidth: 130 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   time: { fontSize: FontSize.xs },
+  badge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

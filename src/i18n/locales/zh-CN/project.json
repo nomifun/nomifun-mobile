@@ -1,0 +1,61 @@
+{
+  "create": {
+    "title": "新建项目会话",
+    "intro": "项目会话把一个磁盘目录绑给这个会话：智能体将以此目录为主工作区，并可在其中读写文件。",
+    "directoryLabel": "工作目录",
+    "pick": "选择工作目录",
+    "change": "更换目录",
+    "unselectedTitle": "尚未选择目录",
+    "unselectedHint": "选一个桌面端机器上的目录；创建后还可以更换。",
+    "nameLabel": "会话名称",
+    "namePlaceholder": "默认使用目录名",
+    "nameHint": "留空则用目录名。",
+    "submit": "创建项目会话",
+    "submitConfirm": "仍要创建",
+    "needDirectory": "请先选择工作目录",
+    "riskyTitle": "这是一个敏感目录",
+    "riskyHint": "「{{path}}」是系统目录或可能存放凭证。智能体以桌面端的系统账号运行，权限并不受这个目录限制。",
+    "riskyConfirmHint": "确认无误后，请再点一次「仍要创建」。",
+    "created": "项目会话已创建",
+    "failed": "创建失败：{{message}}",
+    "whitespaceTitle": "路径首尾有空格",
+    "whitespaceHint": "「{{path}}」的某一段首尾带空格，桌面端会拒绝这样的路径。请重新选择或修正目录名。"
+  },
+  "errors": {
+    "edgeWhitespace": "路径首尾不能有空格",
+    "notOwner": "当前账号不是安装所有者，无法访问桌面文件系统"
+  },
+  "chip": {
+    "temporary": "临时空间",
+    "open": "查看工作目录"
+  },
+  "sheet": {
+    "title": "工作目录",
+    "pathLabel": "完整路径",
+    "copy": "复制路径",
+    "projectHint": "智能体将以此目录为主工作区，并可在其中读写文件。",
+    "temporaryHint": "这是桌面端自动分配的临时目录，由桌面端创建和管理。临时会话不能改绑到项目目录——需要固定目录请新建一个项目会话。",
+    "change": "更换工作目录",
+    "browse": "浏览项目文件",
+    "changeTitle": "更换工作目录？",
+    "changeBody": "新目录：{{path}}\n\n更换会重启该会话的智能体，下一条消息生效。",
+    "changeRisky": "注意：这是系统目录或可能存放凭证的敏感目录。",
+    "changeConfirm": "更换",
+    "changed": "已更换工作目录，下一条消息生效",
+    "changeFailed": "更换失败：{{message}}"
+  },
+  "files": {
+    "title": "项目文件",
+    "root": "根目录",
+    "up": "返回上一级",
+    "readOnly": "只读浏览：手机端不提供打开、编辑或下载。",
+    "emptyTitle": "这里还没有文件",
+    "emptyHint": "智能体在该目录里创建文件后会显示在这里。",
+    "missingTitle": "目录不存在",
+    "missingHint": "这个目录还没被创建，或者已经被删除了。",
+    "noWorkspaceTitle": "该会话没有工作目录",
+    "noWorkspaceHint": "请在桌面端检查这个会话的配置。",
+    "loadFailed": "无法读取项目文件",
+    "depthLimit": "已到可浏览的最深层级（10 层）。"
+  }
+}

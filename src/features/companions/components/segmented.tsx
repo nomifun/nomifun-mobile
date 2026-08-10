@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 export interface SegmentItem<T extends string> {
   key: T;
@@ -27,7 +28,7 @@ export function Segmented<T extends string>({
           <Pressable
             key={item.key}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            {...a11yState({ selected: active })}
             onPress={() => onChange(item.key)}
             style={[
               styles.segment,
@@ -74,7 +75,7 @@ export function ChipRow<T extends string>({
           <Pressable
             key={item.key}
             accessibilityRole="button"
-            accessibilityState={{ selected: active }}
+            {...a11yState({ selected: active })}
             onPress={() => onChange(item.key)}
             style={[
               styles.chip,

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 import type { TagSummary } from '../types';
 
@@ -36,7 +37,7 @@ export function TagStrip({ tags, selected, onSelect }: TagStripProps) {
     <Pressable
       key={key}
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      {...a11yState({ selected: active })}
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,

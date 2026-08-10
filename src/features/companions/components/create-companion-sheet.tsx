@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button, TextField, toast } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 import { createCompanion } from '../api';
 import type { CharacterId, CompanionProfile } from '../types';
@@ -91,7 +92,7 @@ export function CreateCompanionSheet({
             <Pressable
               key={id}
               accessibilityRole="button"
-              accessibilityState={{ selected: active }}
+              {...a11yState({ selected: active })}
               onPress={() => setCharacter(id)}
               style={[
                 styles.option,

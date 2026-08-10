@@ -15,7 +15,18 @@
   },
   "create": {
     "action": "新建会话",
-    "defaultName": "新会话"
+    "defaultName": "新会话",
+    "projectAction": "新建项目会话",
+    "projectHint": "绑定桌面上的一个目录作为工作区"
+  },
+  "groups": {
+    "defaultTitle": "未绑定目录",
+    "defaultHint": "没有指定工作目录的会话",
+    "count_one": "{{count}} 个会话",
+    "count_other": "{{count}} 个会话",
+    "expand": "展开该分区",
+    "collapse": "收起该分区",
+    "newInProject": "在此目录下新建会话"
   },
   "actions": {
     "title": "会话操作",
@@ -74,6 +85,7 @@
   "meta": {
     "defaultModel": "默认模型",
     "companion": "伙伴会话",
-    "summoned": "已召唤伙伴"
+    "summoned": "已召唤伙伴",
+    "projectSession": "项目会话"
   }
 }

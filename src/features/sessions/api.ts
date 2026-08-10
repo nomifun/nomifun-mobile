@@ -37,7 +37,18 @@ export interface ConversationExtra {
   companion_id?: string;
   summon?: { companion_id?: string; summoned_at?: number };
   channel_platform?: string;
+  /**
+   * Absolute agent cwd on the desktop machine. Non-empty + not temporary =
+   * "project session" (there is no project table server-side).
+   */
   workspace?: string;
+  /**
+   * Response-only, re-derived by the server on every read (`workspace` sits
+   * under its data dir ⇒ auto-provisioned temp workspace). Never send it:
+   * create strips it, and a PATCH that touches the temp-workspace bookkeeping
+   * corrupts the row.
+   */
+  is_temporary_workspace?: boolean;
   [key: string]: unknown;
 }
 
@@ -209,11 +220,42 @@ async function resolveDefaultChatModel(): Promise<ModelRef | undefined> {
   return undefined;
 }
 
-/** `type` + `extra` are required by the server; the id is minted server-side. */
-export async function createConversation(name?: string): Promise<Conversation> {
+export interface CreateConversationOptions {
+  /**
+   * Absolute directory on the desktop machine — supplying it makes the new row
+   * a *project session* (`extra.workspace`). It must come from
+   * `GET /api/fs/browse` (the create endpoint does not check that the path
+   * exists, so a hand-typed path only fails when the first message spawns the
+   * agent process).
+   */
+  workspace?: string;
+}
+
+/**
+ * `type` + `extra` are required by the server; the id is minted server-side.
+ *
+ * `extra` carries *only* `workspace`, and only when one was chosen:
+ * - plain session → `extra: {}` and the server auto-provisions a temp
+ *   workspace (and owns `temp_workspace_id` for it);
+ * - project session → `extra: {workspace}`. `custom_workspace` is stripped
+ *   server-side, `default_files` is never read, and `merge_extra` /
+ *   `temp_workspace_id` / `is_temporary_workspace` must never be sent.
+ */
+export async function createConversation(
+  name?: string,
+  options: CreateConversationOptions = {},
+): Promise<Conversation> {
   const model = await resolveDefaultChatModel();
+  // Trim like the desktop's picker does: a stray edge space would make the
+  // server reject the whole create with WORKSPACE_PATH_EDGE_WHITESPACE.
+  const workspace = options.workspace?.trim();
   return api<Conversation>('/api/conversations', {
-    body: { type: 'nomi', name, ...(model ? { model } : {}), extra: {} },
+    body: {
+      type: 'nomi',
+      name,
+      ...(model ? { model } : {}),
+      extra: workspace ? { workspace } : {},
+    },
   });
 }
 

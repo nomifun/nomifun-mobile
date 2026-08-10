@@ -10,6 +10,7 @@ import {
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -52,6 +53,11 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      {...a11yState({ disabled: !!inactive, busy: !!loading })}
+      // react-native-web derives `aria-disabled` (and tab-order removal) from
+      // this prop and overwrites anything we pass, so set it rather than only
+      // withholding onPress.
+      disabled={!!inactive}
       onPress={inactive ? undefined : onPress}
       style={({ pressed }) => [
         styles.base,

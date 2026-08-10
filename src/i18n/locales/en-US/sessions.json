@@ -15,7 +15,18 @@
   },
   "create": {
     "action": "New session",
-    "defaultName": "New session"
+    "defaultName": "New session",
+    "projectAction": "New project session",
+    "projectHint": "Bind a directory on the desktop as the workspace"
+  },
+  "groups": {
+    "defaultTitle": "No directory",
+    "defaultHint": "Sessions without a chosen working directory",
+    "count_one": "1 session",
+    "count_other": "{{count}} sessions",
+    "expand": "Expand this group",
+    "collapse": "Collapse this group",
+    "newInProject": "New session in this directory"
   },
   "actions": {
     "title": "Session actions",
@@ -74,6 +85,7 @@
   "meta": {
     "defaultModel": "Default model",
     "companion": "Companion session",
-    "summoned": "Companion summoned"
+    "summoned": "Companion summoned",
+    "projectSession": "Project session"
   }
 }

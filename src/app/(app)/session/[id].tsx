@@ -15,6 +15,7 @@ import { ApiError } from '@/api/types';
 import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/components/ui';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
+import { WorkspacePanel } from '@/features/projects/components/workspace-panel';
 import { Composer } from '@/features/sessions/components/composer';
 import { MessageItem } from '@/features/sessions/components/message-item';
 import { TypingIndicator } from '@/features/sessions/components/typing-indicator';
@@ -141,6 +142,15 @@ export default function SessionDetailScreen() {
     />
   );
 
+  // Working-directory pill + panel (project sessions and temporary workspaces
+  // alike); renders nothing while the row has no workspace.
+  const workspaceBar = (
+    <WorkspacePanel
+      conversation={conversation.data}
+      onChanged={() => void conversation.mutate()}
+    />
+  );
+
   const composer = (
     <Composer
       streaming={chat.streaming}
@@ -155,6 +165,7 @@ export default function SessionDetailScreen() {
     return (
       <Screen scroll={false}>
         {header}
+        {workspaceBar}
         <Loading label={tc('state.loading')} />
       </Screen>
     );
@@ -164,6 +175,7 @@ export default function SessionDetailScreen() {
     return (
       <Screen scroll={false}>
         {header}
+        {workspaceBar}
         <ErrorState
           message={errorText(chat.error, t('detail.loadFailed'))}
           onRetry={chat.retry}
@@ -178,6 +190,7 @@ export default function SessionDetailScreen() {
     return (
       <Screen scroll={false} keyboardAvoiding footer={composer}>
         {header}
+        {workspaceBar}
         <EmptyState
           icon="chatbubble-ellipses-outline"
           title={t('detail.emptyTitle')}
@@ -190,6 +203,7 @@ export default function SessionDetailScreen() {
   return (
     <Screen scroll={false} keyboardAvoiding footer={composer}>
       {header}
+      {workspaceBar}
       <FlatList
         ref={listRef}
         data={data}

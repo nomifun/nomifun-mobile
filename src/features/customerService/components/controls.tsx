@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 export interface SegmentOption<T extends string> {
   value: T;
@@ -35,7 +36,7 @@ export function Segments<T extends string>({
           <Pressable
             key={option.value}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            {...a11yState({ selected: active })}
             onPress={() => onChange(option.value)}
             style={[
               styles.segment,
@@ -207,7 +208,7 @@ export function Chips<T extends string>({
           <Pressable
             key={option.value}
             accessibilityRole="button"
-            accessibilityState={{ selected: active }}
+            {...a11yState({ selected: active })}
             onPress={() => onChange(option.value)}
             style={[
               styles.chip,
@@ -252,7 +253,7 @@ export function CheckRow({
   return (
     <Pressable
       accessibilityRole="checkbox"
-      accessibilityState={{ checked, disabled: !!disabled }}
+      {...a11yState({ checked, disabled: !!disabled })}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [

@@ -26,6 +26,7 @@ import {
   type FrequencyPreset,
 } from '@/features/tasks/schedule-presets';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 /**
  * Create (`/task/new`) and edit (`/task/new?id=…`) in one screen, mirroring the
@@ -279,7 +280,7 @@ export default function TaskFormScreen() {
                   <Pressable
                     key={option.conversation_id}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
+                    {...a11yState({ selected: active })}
                     onPress={() => setConversationId(option.conversation_id)}
                     style={({ pressed }) => [
                       styles.option,

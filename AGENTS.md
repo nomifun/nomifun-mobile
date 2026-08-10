@@ -28,3 +28,12 @@ configured Git identity.
   `src/components/`; API layer in `src/api/`; keep them separated.
 - Match the nomifun design tokens in `src/constants/theme.ts` — do not invent
   new colors ad hoc.
+- Adding a NEW platform-specific file (`foo.web.tsx` next to `foo.tsx`) needs a
+  Metro restart with `--clear`: its resolution cache keeps serving the old
+  variant, and the symptom is a silently missing feature, not an error.
+- react-native-web drops `accessibilityState`, so use `a11yState()` from
+  `@/utils/a11y` (emits both shapes), and pass `disabled` to `Pressable`
+  itself — RNW derives `aria-disabled` and tab-order from that prop and
+  overwrites anything you pass by hand.
+- A toast fired while a `Modal` is open is hidden underneath it on native
+  (web portals above it). Modal screens must also show inline feedback.

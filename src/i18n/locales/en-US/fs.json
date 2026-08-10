@@ -1,0 +1,60 @@
+{
+  "picker": {
+    "title": "Choose a folder",
+    "up": "Go up one level",
+    "start": "Back to shortcuts",
+    "startTitle": "Common places",
+    "home": "Home folder",
+    "homeHint": "Home directory of the desktop account",
+    "workspace": "Workspace root",
+    "drives": "This PC (drives)",
+    "drivesHint": "Pick a drive to start browsing",
+    "manual": "Type a path",
+    "manualHint": "Hidden folders (names starting with \".\", e.g. ~/.config/xxx) are never listed — type the path to reach them.",
+    "newFolder": "New folder",
+    "select": "Use this folder",
+    "modified": "Modified {{time}}",
+    "emptyTitle": "No subfolders here",
+    "emptyHint": "You can still use this folder; hidden folders (starting with \".\") are not listed, so type the path instead.",
+    "truncated": "Showing the first {{count}} entries only — type a path to reach the rest.",
+    "driveHint": "Pick a drive first: the drive list itself cannot be a working folder."
+  },
+  "manual": {
+    "title": "Type a path",
+    "label": "Absolute folder path",
+    "placeholder": "/home/you/projects/demo",
+    "hint": "\"~\" is supported. The desktop checks the folder exists first, then its canonical path is used.",
+    "submit": "Check and use"
+  },
+  "newFolder": {
+    "title": "New folder",
+    "label": "Folder name",
+    "placeholder": "my-project",
+    "hint": "One level only, no \"/\" or \"\\\". You will be taken into the new folder.",
+    "submit": "Create",
+    "created": "Created \"{{name}}\""
+  },
+  "risky": {
+    "warning": "The agent will treat this folder as its main workspace and can read and write inside it — a specific project folder is safer.",
+    "whitespace": "A path segment starts or ends with a space; the desktop rejects such working folders. Pick another one."
+  },
+  "errors": {
+    "emptyInput": "Enter a folder path first",
+    "notFound": "That path does not exist or cannot be opened — check the spelling",
+    "notDirectory": "That is not a folder, or the path cannot be resolved",
+    "outsideSandbox": "That path is outside what the desktop allows browsing",
+    "ownerRequired": "This account cannot browse desktop files — sign in as the installation owner",
+    "authExpired": "Your session expired — reconnect to the desktop",
+    "csrf": "Security check failed — reconnect to the desktop and try again",
+    "network": "Lost the connection to your desktop — make sure it is still running",
+    "server": "Desktop returned an error: {{message}}",
+    "unknown": "Could not read that folder",
+    "nameRequired": "Enter a folder name",
+    "nameEdgeWhitespace": "The name cannot start or end with a space",
+    "nameExists": "That name is already taken",
+    "invalidName": "A folder name must be a single component, without \"/\" or \"\\\"",
+    "parentNotFound": "The parent folder does not exist or cannot be opened",
+    "parentRequired": "Open a folder first, then create one inside it",
+    "createDenied": "The desktop has no permission to create a folder here"
+  }
+}

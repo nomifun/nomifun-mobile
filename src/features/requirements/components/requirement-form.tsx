@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, TextField } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 export interface RequirementFormValues {
   title: string;
@@ -92,7 +93,7 @@ export function RequirementForm({
                 <Pressable
                   key={option}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
+                  {...a11yState({ selected: active })}
                   onPress={() => {
                     setTag(option);
                     if (errors.tag) setErrors((prev) => ({ ...prev, tag: undefined }));

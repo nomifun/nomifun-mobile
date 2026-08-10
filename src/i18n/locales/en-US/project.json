@@ -1,0 +1,61 @@
+{
+  "create": {
+    "title": "New project session",
+    "intro": "A project session binds one directory on disk to this conversation: the agent works out of that directory and can read and write files in it.",
+    "directoryLabel": "Working directory",
+    "pick": "Choose a directory",
+    "change": "Change directory",
+    "unselectedTitle": "No directory chosen yet",
+    "unselectedHint": "Pick a directory on the desktop machine; you can change it later.",
+    "nameLabel": "Session name",
+    "namePlaceholder": "Defaults to the folder name",
+    "nameHint": "Leave empty to use the folder name.",
+    "submit": "Create project session",
+    "submitConfirm": "Create anyway",
+    "needDirectory": "Choose a working directory first",
+    "riskyTitle": "This is a sensitive directory",
+    "riskyHint": "“{{path}}” is a system directory or may hold credentials. The agent runs as the desktop machine's OS user, so its permissions are not limited to this directory.",
+    "riskyConfirmHint": "If that is what you want, tap “Create anyway” once more.",
+    "created": "Project session created",
+    "failed": "Could not create: {{message}}",
+    "whitespaceTitle": "Path has edge whitespace",
+    "whitespaceHint": "A segment of “{{path}}” starts or ends with a space; the desktop rejects such paths. Pick the directory again or rename it."
+  },
+  "errors": {
+    "edgeWhitespace": "Path segments cannot start or end with a space",
+    "notOwner": "This account is not the installation owner, so it cannot reach the desktop file system"
+  },
+  "chip": {
+    "temporary": "Temporary space",
+    "open": "Show working directory"
+  },
+  "sheet": {
+    "title": "Working directory",
+    "pathLabel": "Full path",
+    "copy": "Copy path",
+    "projectHint": "The agent works out of this directory and can read and write files in it.",
+    "temporaryHint": "This is a temporary directory the desktop allocated automatically and manages itself. Temporary sessions cannot be rebound to a project directory — create a new project session if you need a fixed one.",
+    "change": "Change working directory",
+    "browse": "Browse project files",
+    "changeTitle": "Change working directory?",
+    "changeBody": "New directory: {{path}}\n\nChanging it restarts this conversation's agent; it takes effect on the next message.",
+    "changeRisky": "Careful: this is a system directory or one that may hold credentials.",
+    "changeConfirm": "Change",
+    "changed": "Working directory changed; effective on the next message",
+    "changeFailed": "Could not change: {{message}}"
+  },
+  "files": {
+    "title": "Project files",
+    "root": "Root",
+    "up": "Go up one level",
+    "readOnly": "Read-only: the phone does not open, edit or download files.",
+    "emptyTitle": "No files here yet",
+    "emptyHint": "Files the agent creates in this directory show up here.",
+    "missingTitle": "Directory not found",
+    "missingHint": "It has not been created yet, or it was deleted.",
+    "noWorkspaceTitle": "This session has no working directory",
+    "noWorkspaceHint": "Check the conversation's configuration on the desktop.",
+    "loadFailed": "Could not read the project files",
+    "depthLimit": "Deepest browsable level reached (10 levels)."
+  }
+}

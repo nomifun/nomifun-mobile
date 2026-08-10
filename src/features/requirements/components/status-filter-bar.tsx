@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 import { STATUS_FILTERS, type StatusFilter } from '../types';
 
@@ -35,7 +36,7 @@ export function StatusFilterBar({ value, counts, onChange }: StatusFilterBarProp
             <Pressable
               key={option}
               accessibilityRole="button"
-              accessibilityState={{ selected: active }}
+              {...a11yState({ selected: active })}
               hitSlop={6}
               onPress={() => onChange(option)}
               style={({ pressed }) => [

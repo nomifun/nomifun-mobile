@@ -5,18 +5,20 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ApiError } from '@/api/types';
-import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, ListRow, Loading, Screen, toast } from '@/components/ui';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { FontSize, Spacing } from '@/constants/theme';
+import { FontSize, Radius, Spacing } from '@/constants/theme';
 import {
   createConversation,
   deleteConversation,
   patchConversation,
   type Conversation,
 } from '@/features/sessions/api';
+import { ProjectSection } from '@/features/sessions/components/project-section';
 import { SessionActions } from '@/features/sessions/components/session-actions';
 import { SessionRow } from '@/features/sessions/components/session-row';
-import { useConversationList } from '@/features/sessions/hooks';
+import { useCollapsedWorkpaths, useConversationList } from '@/features/sessions/hooks';
+import type { ConversationGroup } from '@/features/sessions/workpath';
 import { useTheme } from '@/hooks/use-theme';
 import { useWsStatus } from '@/hooks/use-ws';
 
@@ -26,12 +28,23 @@ function errorText(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * One flat FlatList over section headers + rows. A flattened list (rather than
+ * SectionList) keeps `onEndReached` paging, pull-to-refresh and the existing
+ * key extractor working unchanged, and lets a collapsed section drop its rows
+ * without touching the data source.
+ */
+type ListItem =
+  | { kind: 'header'; group: ConversationGroup }
+  | { kind: 'session'; conversation: Conversation };
+
 export default function SessionListScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation('sessions');
   const { t: tc } = useTranslation('common');
   const list = useConversationList();
   const wsStatus = useWsStatus();
+  const { collapsed, toggle } = useCollapsedWorkpaths();
 
   const [creating, setCreating] = useState(false);
   const [target, setTarget] = useState<Conversation | null>(null);
@@ -49,6 +62,19 @@ export default function SessionListScreen() {
       setCreating(false);
     }
   }, [creating, list, t, tc]);
+
+  /**
+   * Project sessions are created by unit 3's wizard, which needs a directory
+   * before it can POST. `workspace` pre-selects the directory so "another
+   * session in this project" is a single tap.
+   */
+  const createProject = useCallback((workspace?: string) => {
+    router.push(
+      workspace
+        ? `/session/new-project?workspace=${encodeURIComponent(workspace)}`
+        : '/session/new-project',
+    );
+  }, []);
 
   const headerOptions = useMemo(
     () => ({
@@ -79,6 +105,20 @@ export default function SessionListScreen() {
     },
     [list, t, tc],
   );
+
+  const rows = useMemo<ListItem[]>(() => {
+    const groups = list.groups;
+    // With no project at all, a lone "unbound" header would be pure chrome.
+    const onlyDefault = groups.length === 1 && groups[0]?.isDefault === true;
+    const out: ListItem[] = [];
+    for (const group of groups) {
+      const headed = !(group.isDefault && onlyDefault);
+      if (headed) out.push({ kind: 'header', group });
+      if (headed && collapsed[group.key]) continue;
+      for (const conversation of group.items) out.push({ kind: 'session', conversation });
+    }
+    return out;
+  }, [collapsed, list.groups]);
 
   const renderFooter = () => {
     if (list.isLoadingMore) {
@@ -119,17 +159,32 @@ export default function SessionListScreen() {
         <Text style={[styles.wsHint, { color: colors.warning }]}>{t('list.wsOffline')}</Text>
       ) : null}
       <FlatList
-        data={list.items}
-        keyExtractor={(item) => item.conversation_id}
+        data={rows}
+        keyExtractor={(item) =>
+          item.kind === 'header' ? `group:${item.group.key}` : item.conversation.conversation_id
+        }
         contentContainerStyle={styles.content}
-        renderItem={({ item }) => (
-          <SessionRow
-            conversation={item}
-            generating={list.isGenerating(item.conversation_id)}
-            onPress={() => router.push(`/session/${item.conversation_id}`)}
-            onLongPress={() => setTarget(item)}
-          />
-        )}
+        renderItem={({ item }) =>
+          item.kind === 'header' ? (
+            <ProjectSection
+              group={item.group}
+              collapsed={collapsed[item.group.key] === true}
+              onToggle={() => toggle(item.group.key)}
+              onCreate={
+                item.group.isDefault
+                  ? undefined
+                  : () => createProject(item.group.path ?? item.group.key)
+              }
+            />
+          ) : (
+            <SessionRow
+              conversation={item.conversation}
+              generating={list.isGenerating(item.conversation.conversation_id)}
+              onPress={() => router.push(`/session/${item.conversation.conversation_id}`)}
+              onLongPress={() => setTarget(item.conversation)}
+            />
+          )
+        }
         refreshControl={
           <RefreshControl
             refreshing={list.isRefreshing}
@@ -139,6 +194,27 @@ export default function SessionListScreen() {
         }
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.4}
+        /**
+         * The header `＋` stays "plain session" (one tap, unchanged habit); the
+         * project entry gets a labelled row instead of hiding behind a menu,
+         * because "bind a directory" needs the explanation and is the rarer of
+         * the two actions.
+         */
+        ListHeaderComponent={
+          rows.length === 0 ? null : (
+            <ListRow
+              title={t('create.projectAction')}
+              subtitle={t('create.projectHint')}
+              left={
+                <View style={[styles.projectIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Ionicons name="folder-open-outline" size={18} color={colors.primary} />
+                </View>
+              }
+              chevron
+              onPress={() => createProject()}
+            />
+          )
+        }
         ListFooterComponent={renderFooter}
         ListEmptyComponent={
           <EmptyState
@@ -146,9 +222,14 @@ export default function SessionListScreen() {
             title={t('list.emptyTitle')}
             description={t('list.emptyHint')}
             action={
-              <Button onPress={() => void create()} loading={creating}>
-                {t('create.action')}
-              </Button>
+              <View style={styles.emptyActions}>
+                <Button onPress={() => void create()} loading={creating}>
+                  {t('create.action')}
+                </Button>
+                <Button variant="secondary" onPress={() => createProject()}>
+                  {t('create.projectAction')}
+                </Button>
+              </View>
             }
           />
         }
@@ -192,4 +273,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: Spacing.xs,
   },
+  projectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActions: { gap: Spacing.sm, alignSelf: 'stretch', minWidth: 220 },
 });

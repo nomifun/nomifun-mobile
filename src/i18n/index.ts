@@ -5,8 +5,10 @@ import enCommon from './locales/en-US/common.json';
 import enCompanions from './locales/en-US/companions.json';
 import enConnect from './locales/en-US/connect.json';
 import enCustomerService from './locales/en-US/customerService.json';
+import enFs from './locales/en-US/fs.json';
 import enModels from './locales/en-US/models.json';
 import enNotifications from './locales/en-US/notifications.json';
+import enProject from './locales/en-US/project.json';
 import enRequirements from './locales/en-US/requirements.json';
 import enSessions from './locales/en-US/sessions.json';
 import enSettings from './locales/en-US/settings.json';
@@ -15,8 +17,10 @@ import zhCommon from './locales/zh-CN/common.json';
 import zhCompanions from './locales/zh-CN/companions.json';
 import zhConnect from './locales/zh-CN/connect.json';
 import zhCustomerService from './locales/zh-CN/customerService.json';
+import zhFs from './locales/zh-CN/fs.json';
 import zhModels from './locales/zh-CN/models.json';
 import zhNotifications from './locales/zh-CN/notifications.json';
+import zhProject from './locales/zh-CN/project.json';
 import zhRequirements from './locales/zh-CN/requirements.json';
 import zhSessions from './locales/zh-CN/sessions.json';
 import zhSettings from './locales/zh-CN/settings.json';
@@ -33,6 +37,8 @@ export const NAMESPACES = [
   'customerService',
   'settings',
   'notifications',
+  'fs',
+  'project',
 ] as const;
 
 void i18n.use(initReactI18next).init({
@@ -48,6 +54,8 @@ void i18n.use(initReactI18next).init({
       customerService: zhCustomerService,
       settings: zhSettings,
       notifications: zhNotifications,
+      fs: zhFs,
+      project: zhProject,
     },
     'en-US': {
       common: enCommon,
@@ -60,6 +68,8 @@ void i18n.use(initReactI18next).init({
       customerService: enCustomerService,
       settings: enSettings,
       notifications: enNotifications,
+      fs: enFs,
+      project: enProject,
     },
   },
   lng: 'zh-CN',

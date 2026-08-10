@@ -3,13 +3,15 @@
  *
  * Two hooks:
  * - `useConversationList()` — cursor-paginated list, kept live by
- *   `conversation.listChanged` / `turn.*`, re-snapshotted on `ws.reconnected`.
+ *   `conversation.listChanged` / `turn.*`, re-snapshotted on `ws.reconnected`,
+ *   plus the project sections derived from every loaded page.
  * - `useChatSession(id)` — newest history window + older pages + the live
  *   `message.stream` tail, with optimistic send and stop.
  *
  * The server never replays WS frames, so every reconnect refetches.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import useSWR from 'swr';
 import useSWRInfinite from 'swr/infinite';
 
@@ -36,6 +38,7 @@ import {
   type ChatMessage,
   type StreamFrame,
 } from './stream';
+import { buildConversationGroups, type ConversationGroup } from './workpath';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -71,6 +74,12 @@ function useDebouncedCallback(fn: () => void, delay: number) {
 
 export interface ConversationListState {
   items: Conversation[];
+  /**
+   * `items` bucketed by workpath: the default node first, then one section per
+   * project directory. Derived from every page loaded so far, so paging in more
+   * rows grows the existing sections instead of appending a flat tail.
+   */
+  groups: ConversationGroup[];
   isLoading: boolean;
   isLoadingMore: boolean;
   isRefreshing: boolean;
@@ -143,6 +152,10 @@ export function useConversationList(): ConversationListState {
   const lastPage = data && data.length > 0 ? data[data.length - 1] : undefined;
   const isLoadingMore = size > 0 && !!data && data.length === size && data[size - 1] === undefined;
 
+  // Grouping runs on the whole loaded set (not per page) and inherits the sort
+  // above, so pinned-first / modified_at-desc holds inside every section.
+  const groups = useMemo(() => buildConversationGroups(items), [items]);
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -165,6 +178,7 @@ export function useConversationList(): ConversationListState {
 
   return {
     items,
+    groups,
     isLoading: isLoading && !data,
     isLoadingMore: isLoadingMore || (isValidating && !!data && data.length < size),
     isRefreshing: refreshing,
@@ -177,6 +191,67 @@ export function useConversationList(): ConversationListState {
     refresh,
     retry: () => void mutate(),
   };
+}
+
+const COLLAPSED_STORAGE_KEY = 'nomifun:session-list-collapsed-workpaths:v1';
+
+export interface CollapsedWorkpaths {
+  /** `true` for a collapsed section key; absent means expanded (the default). */
+  collapsed: Record<string, boolean>;
+  toggle: (key: string) => void;
+}
+
+/**
+ * Which project sections the user folded away, remembered across launches.
+ * Persisted as a plain key array — sections are named by workpath, so a project
+ * that disappears simply stops matching and costs one dead string.
+ */
+export function useCollapsedWorkpaths(): CollapsedWorkpaths {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(COLLAPSED_STORAGE_KEY)
+      .then((raw) => {
+        if (!active) return;
+        if (raw) {
+          try {
+            const parsed: unknown = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const next: Record<string, boolean> = {};
+              for (const key of parsed) if (typeof key === 'string') next[key] = true;
+              setCollapsed(next);
+            }
+          } catch {
+            // Corrupt entry — start from "everything expanded".
+          }
+        }
+        setLoaded(true);
+      })
+      .catch(() => {
+        // Storage unavailable (private-mode web): keep the in-memory state.
+        if (active) setLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Only write after the initial read, or the empty first render would wipe it.
+  useEffect(() => {
+    if (!loaded) return;
+    const keys = Object.keys(collapsed).filter((key) => collapsed[key]);
+    void AsyncStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(keys)).catch(() => {
+      // Best effort; the fold state still holds for this session.
+    });
+  }, [collapsed, loaded]);
+
+  const toggle = useCallback((key: string) => {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  return { collapsed, toggle };
 }
 
 /** Single conversation row (header title, model chip, runtime state). */

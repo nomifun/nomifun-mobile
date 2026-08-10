@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 export interface PillOption<T extends string> {
   value: T;
@@ -33,7 +34,7 @@ export function SegmentedPills<T extends string>({
       <Pressable
         key={option.value}
         accessibilityRole="button"
-        accessibilityState={{ selected }}
+        {...a11yState({ selected })}
         onPress={() => onChange(option.value)}
         style={({ pressed }) => [
           styles.pill,
