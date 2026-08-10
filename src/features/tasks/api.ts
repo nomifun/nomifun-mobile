@@ -49,7 +49,11 @@ export function createCronJob(payload: CronJobCreate): Promise<CronJob> {
   return api<CronJob>(CRON_JOBS_KEY, { method: 'POST', body: payload });
 }
 
-/** Deletes the task *and* every conversation it spawned. */
+/**
+ * Deletes the task only. Conversations it was bound to — or created — and their
+ * messages survive (verified against `nomifun-cron`'s delete path), so the
+ * confirmation copy must not promise otherwise.
+ */
 export function deleteCronJob(id: string): Promise<unknown> {
   return api<unknown>(cronJobKey(id), { method: 'DELETE' });
 }

@@ -112,14 +112,16 @@ export function NotesPanel({ csAgentId }: { csAgentId: string }) {
           </View>
 
           {notes.map((note) => (
-            <Pressable
+            // The 启用 switch must NOT sit inside the edit-pressable: a tap on a
+            // nested Switch also fires the parent press on react-native-web, so
+            // toggling would pop the editor sheet open every time. Only the
+            // body (content + 点按编辑 hint) opens the editor.
+            <View
               key={note.cs_note_id}
-              accessibilityRole="button"
-              onPress={() => setEditing(note)}
-              style={({ pressed }) => [
+              style={[
                 styles.card,
                 {
-                  backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                  backgroundColor: colors.surface,
                   borderColor: colors.border,
                   opacity: note.enabled ? 1 : 0.6,
                 },
@@ -139,16 +141,25 @@ export function NotesPanel({ csAgentId }: { csAgentId: string }) {
                   ios_backgroundColor={colors.surfaceMuted}
                 />
               </View>
-              <Text style={[styles.content, { color: colors.text }]} numberOfLines={3}>
-                {note.content}
-              </Text>
-              <View style={styles.cardFoot}>
-                <Ionicons name="create-outline" size={13} color={colors.textTertiary} />
-                <Text style={[styles.footText, { color: colors.textTertiary }]}>
-                  {t('notes.tapToEdit')}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setEditing(note)}
+                style={({ pressed }) => [
+                  styles.body,
+                  pressed && { backgroundColor: colors.surfaceMuted },
+                ]}
+              >
+                <Text style={[styles.content, { color: colors.text }]} numberOfLines={3}>
+                  {note.content}
                 </Text>
-              </View>
-            </Pressable>
+                <View style={styles.cardFoot}>
+                  <Ionicons name="create-outline" size={13} color={colors.textTertiary} />
+                  <Text style={[styles.footText, { color: colors.textTertiary }]}>
+                    {t('notes.tapToEdit')}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
           ))}
         </>
       )}
@@ -182,6 +193,7 @@ const styles = StyleSheet.create({
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   spacer: { flex: 1 },
+  body: { gap: Spacing.sm, borderRadius: Radius.md, paddingVertical: Spacing.xs },
   content: { fontSize: FontSize.sm, lineHeight: 20 },
   cardFoot: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footText: { fontSize: FontSize.xs },

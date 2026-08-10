@@ -22,7 +22,7 @@
     "loadMore": "加载更多",
     "loadedAll": "已显示全部 {{count}} 条",
     "tooMany": "仅显示最近 {{count}} 条，更多请在桌面端查看",
-    "wsOffline": "实时连接已断开，下拉可手动刷新"
+    "wsOffline": "实时连接已断开，可手动刷新"
   },
   "paused": {
     "title": "标签「{{tag}}」已暂停",
@@ -58,6 +58,7 @@
     "attachmentsHint": "图片附件请在桌面端查看",
     "inProgressHint": "正在执行中，状态由桌面端的自动执行流程控制。",
     "frozenHint": "已结束的需求不能再改状态，需要重跑请新建一条。",
+    "failedHint": "这条需求执行失败了，可以重新排队再试一次，或直接删除。",
     "notFound": "需求不存在或已被删除"
   },
   "actions": {

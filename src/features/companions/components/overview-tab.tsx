@@ -5,11 +5,12 @@
  * bases, robot pairing) is shown read-only with a "do it on the desktop" hint.
  */
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Card, SectionTitle, Tag, toast } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

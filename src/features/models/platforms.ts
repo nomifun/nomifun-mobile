@@ -76,7 +76,8 @@ export function isManagedProvider(platform: string): boolean {
  * Subscription-plan gateways whose base URL exposes no `/models` catalog.
  * `detect-protocol` is an OpenAI-style `/models` probe, so it 404s there and
  * would wrongly reject a valid key — the per-model heartbeat is the only
- * correct validation for these. Mirrors `platformSkipsPreSaveKeyProbe()`.
+ * correct validation for these. Mirrors the desktop's
+ * `PLATFORMS_WITHOUT_MODELS_ENDPOINT`.
  */
 const NO_MODELS_ENDPOINT = new Set([
   'ark-coding-plan',
@@ -88,8 +89,25 @@ const NO_MODELS_ENDPOINT = new Set([
   'qianfan-coding-plan',
 ]);
 
+/**
+ * True only when the platform genuinely has no `/models` catalog — this drives
+ * user-facing copy, so `stepfun` must NOT be in it: plain StepFun does serve
+ * `/v1/models`, and claiming otherwise contradicts the catalog the very same
+ * screen just fetched.
+ */
 export function platformHasNoModelsEndpoint(platform: string): boolean {
-  return NO_MODELS_ENDPOINT.has(platform) || platform === 'stepfun';
+  return NO_MODELS_ENDPOINT.has(platform);
+}
+
+/**
+ * Whether an extra protocol probe should be skipped before create/save.
+ * Mirrors the desktop's `platformSkipsPreSaveKeyProbe()`: plain `stepfun` is
+ * included because some proxy/DNS routes reset its TLS connection while the
+ * curated catalog still works — re-probing would turn a recoverable catalog
+ * failure into a hard blocker.
+ */
+export function platformSkipsPreSaveKeyProbe(platform: string): boolean {
+  return platformHasNoModelsEndpoint(platform) || platform === 'stepfun';
 }
 
 /** Multi-key strings are comma/newline separated. */

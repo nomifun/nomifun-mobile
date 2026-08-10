@@ -3,10 +3,11 @@
  * centered — the backend has no human-operator role, so there is nothing to
  * reply with here by design.
  */
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState, ErrorState, Loading } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

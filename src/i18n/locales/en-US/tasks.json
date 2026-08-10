@@ -148,6 +148,6 @@
   },
   "confirmDelete": {
     "title": "Delete scheduled task",
-    "message": "Delete this scheduled task? Every conversation it created will be deleted too."
+    "message": "Delete this scheduled task? The conversations and messages it produced are kept."
   }
 }

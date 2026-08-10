@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ApiError } from '@/api/types';
 import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import {
   createConversation,
@@ -17,6 +18,7 @@ import { SessionActions } from '@/features/sessions/components/session-actions';
 import { SessionRow } from '@/features/sessions/components/session-row';
 import { useConversationList } from '@/features/sessions/hooks';
 import { useTheme } from '@/hooks/use-theme';
+import { useWsStatus } from '@/hooks/use-ws';
 
 function errorText(error: unknown, fallback: string): string {
   if (error instanceof ApiError) return error.message;
@@ -29,6 +31,7 @@ export default function SessionListScreen() {
   const { t } = useTranslation('sessions');
   const { t: tc } = useTranslation('common');
   const list = useConversationList();
+  const wsStatus = useWsStatus();
 
   const [creating, setCreating] = useState(false);
   const [target, setTarget] = useState<Conversation | null>(null);
@@ -112,6 +115,9 @@ export default function SessionListScreen() {
   return (
     <Screen scroll={false}>
       <Stack.Screen options={headerOptions} />
+      {wsStatus === 'reconnecting' ? (
+        <Text style={[styles.wsHint, { color: colors.warning }]}>{t('list.wsOffline')}</Text>
+      ) : null}
       <FlatList
         data={list.items}
         keyExtractor={(item) => item.conversation_id}
@@ -176,6 +182,7 @@ export default function SessionListScreen() {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: Spacing.lg },
+  wsHint: { fontSize: FontSize.xs, paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   footer: { fontSize: FontSize.xs, textAlign: 'center', paddingVertical: Spacing.lg },
   footerSpacer: { height: Spacing.lg },
   headerButton: {

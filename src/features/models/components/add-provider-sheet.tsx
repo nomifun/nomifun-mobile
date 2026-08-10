@@ -14,6 +14,7 @@ import {
   apiKeyCount,
   isHttpUrl,
   platformHasNoModelsEndpoint,
+  platformSkipsPreSaveKeyProbe,
 } from '@/features/models/platforms';
 import type { ModelInfo, ProtocolDetectionResponse } from '@/features/models/types';
 
@@ -54,6 +55,7 @@ export function AddProviderSheet({ visible, onClose, onCreated }: AddProviderShe
   const [saving, setSaving] = useState(false);
 
   const noCatalogEndpoint = platformHasNoModelsEndpoint(preset.platform);
+  const skipsProbe = platformSkipsPreSaveKeyProbe(preset.platform);
   const keyCount = apiKeyCount(apiKey);
 
   const reset = () => {
@@ -111,7 +113,7 @@ export function AddProviderSheet({ visible, onClose, onCreated }: AddProviderShe
     setTestError('');
     setDetection(null);
     try {
-      if (!noCatalogEndpoint) {
+      if (!skipsProbe) {
         const result = await detectProtocol({
           base_url: baseUrl.trim(),
           api_key: apiKey.trim(),

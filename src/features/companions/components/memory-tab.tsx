@@ -7,11 +7,12 @@
  * Every mutation carries `companion_id`: the store 404s a foreign row.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, EmptyState, ErrorState, Loading, Tag, TextField } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

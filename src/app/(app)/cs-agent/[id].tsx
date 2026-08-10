@@ -79,7 +79,10 @@ export default function CsAgentDetailScreen() {
         void remove()
           .then(() => {
             toast.success(t('detail.deleted'));
-            router.back();
+            // Deep-linked / refreshed pages have no history entry to pop, and
+            // staying on a deleted agent's config screen is a dead end.
+            if (router.canGoBack()) router.back();
+            else router.replace('/customer-service');
           })
           .catch((err: unknown) => {
             toast.error(err instanceof Error ? err.message : tc('feedback.requestFailed'));

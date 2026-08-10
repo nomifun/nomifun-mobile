@@ -40,6 +40,10 @@ const ROSTER_TOPICS = [
   'companion.config-updated',
   'companion.mood-changed',
   'companion.learn-finished',
+  // `status.memories_active` is part of the roster payload, so a memory written
+  // from any surface changes the 记忆 badge on the card.
+  'companion.memory-created',
+  'companion.memory-deleted',
   'ws.reconnected',
 ];
 
@@ -114,6 +118,11 @@ export function useCompanionDetail(companionId: string) {
   const { refreshing, refresh } = useManualRefresh(useCallback(() => mutate(), [mutate]));
 
   useWsTopic(['companion.config-updated', 'companion.mood-changed'], (payload) => {
+    if (eventConcerns(payload, companionId)) void mutate();
+  });
+  // The profile carries `status.memories_active` / `memories_archived`, so the
+  // 总览 counters go stale unless a memory write also refreshes the profile.
+  useWsTopic(['companion.memory-created', 'companion.memory-deleted'], (payload) => {
     if (eventConcerns(payload, companionId)) void mutate();
   });
   useWsTopic('companion.learn-started', (payload) => {

@@ -22,7 +22,7 @@
     "loadMore": "Load more",
     "loadedAll": "All {{count}} shown",
     "tooMany": "Showing the latest {{count}} — see the rest on desktop",
-    "wsOffline": "Live updates are offline — pull to refresh"
+    "wsOffline": "Realtime connection lost — refresh manually"
   },
   "paused": {
     "title": "Tag “{{tag}}” is paused",
@@ -58,6 +58,7 @@
     "attachmentsHint": "Image attachments open on the desktop",
     "inProgressHint": "Running now — the desktop auto-run loop owns this status.",
     "frozenHint": "Finished requirements are frozen; create a new one to run it again.",
+    "failedHint": "This requirement failed. Requeue it to try again, or delete it.",
     "notFound": "This requirement no longer exists"
   },
   "actions": {

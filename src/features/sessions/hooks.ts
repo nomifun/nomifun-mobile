@@ -129,7 +129,15 @@ export function useConversationList(): ConversationListState {
         out.push(row);
       }
     }
-    return out;
+    // The server orders by `modified_at` only, so a pinned row sinks as soon as
+    // any other conversation sees activity. Mirror the desktop sidebar: pinned
+    // first (newest pin on top), then last activity.
+    return out.sort(
+      (a, b) =>
+        Number(b.pinned === true) - Number(a.pinned === true) ||
+        (a.pinned === true ? (b.pinned_at ?? 0) - (a.pinned_at ?? 0) : 0) ||
+        b.modified_at - a.modified_at,
+    );
   }, [data]);
 
   const lastPage = data && data.length > 0 ? data[data.length - 1] : undefined;

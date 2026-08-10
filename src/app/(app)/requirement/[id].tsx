@@ -23,6 +23,7 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   completeRequirement,
   deleteRequirement,
+  requirementKey,
   setRequirementStatus,
   updateRequirement,
   type UpdateRequirementInput,
@@ -68,12 +69,17 @@ export default function RequirementDetailScreen() {
     }
   }, [detail, tags]);
 
-  const run = async (action: () => Promise<unknown>, successText: string) => {
+  const run = async (
+    action: () => Promise<unknown>,
+    successText: string,
+    /** Keys to evict rather than revalidate (the row is gone after a delete). */
+    dropKeys?: readonly string[],
+  ) => {
     if (!id) return;
     setBusy(true);
     try {
       await action();
-      invalidate();
+      invalidate(dropKeys);
       toast.success(successText);
       setNoteTarget(null);
       setNote('');
@@ -257,11 +263,19 @@ export default function RequirementDetailScreen() {
             </Card>
           ) : null}
 
+          {/*
+            `failed` is terminal for judging but still requeueable, so it must not
+            claim "frozen, create a new one" while a 重新排队 button sits below it.
+          */}
           {isTerminalStatus(item.status) ? (
             <Card style={styles.noticeCard}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />
+              <Ionicons
+                name={canRequeue ? 'refresh-outline' : 'lock-closed-outline'}
+                size={18}
+                color={canRequeue ? colors.warning : colors.textTertiary}
+              />
               <Text style={[styles.notice, { color: colors.textSecondary }]}>
-                {t('detail.frozenHint')}
+                {canRequeue ? t('detail.failedHint') : t('detail.frozenHint')}
               </Text>
             </Card>
           ) : null}
@@ -395,8 +409,14 @@ export default function RequirementDetailScreen() {
                         void run(
                           () => deleteRequirement(item.requirement_id),
                           tc('feedback.deleted'),
+                          [requirementKey(item.requirement_id)],
                         ).then((ok) => {
-                          if (ok) router.back();
+                          if (!ok) return;
+                          // A deep-linked or refreshed page has no history entry
+                          // to pop, and staying on a deleted requirement is a
+                          // dead end.
+                          if (router.canGoBack()) router.back();
+                          else router.replace('/requirements');
                         });
                       },
                     })

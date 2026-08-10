@@ -10,7 +10,8 @@
     "generating": "生成中",
     "waiting": "待确认",
     "untitled": "未命名会话",
-    "createFailed": "新建会话失败：{{message}}"
+    "createFailed": "新建会话失败：{{message}}",
+    "wsOffline": "实时连接已断开，正在重连…"
   },
   "create": {
     "action": "新建会话",

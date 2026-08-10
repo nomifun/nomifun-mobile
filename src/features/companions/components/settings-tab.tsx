@@ -5,11 +5,12 @@
  * that needs a desktop dialog says so instead of shipping a broken control.
  */
 import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { mutate as globalMutate } from 'swr';
 
 import { Button, Card, SectionTitle, TextField, toast } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -42,8 +43,8 @@ export function SettingsTab({
   const [name, setName] = useState(companion.name);
   const [preset, setPreset] = useState(companion.persona?.preset ?? 'lively');
   const [custom, setCustom] = useState(companion.persona?.custom ?? '');
-  const [quietStart, setQuietStart] = useState(companion.appearance?.quiet_start ?? '00:00');
-  const [quietEnd, setQuietEnd] = useState(companion.appearance?.quiet_end ?? '00:00');
+  const [quietStart, setQuietStart] = useState(companion.appearance?.quiet_start ?? '');
+  const [quietEnd, setQuietEnd] = useState(companion.appearance?.quiet_end ?? '');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingDesk, setPendingDesk] = useState<boolean | null>(null);
@@ -54,8 +55,8 @@ export function SettingsTab({
     setName(companion.name);
     setPreset(companion.persona?.preset ?? 'lively');
     setCustom(companion.persona?.custom ?? '');
-    setQuietStart(companion.appearance?.quiet_start ?? '00:00');
-    setQuietEnd(companion.appearance?.quiet_end ?? '00:00');
+    setQuietStart(companion.appearance?.quiet_start ?? '');
+    setQuietEnd(companion.appearance?.quiet_end ?? '');
   }, [
     companion.companion_id,
     companion.name,
@@ -66,7 +67,10 @@ export function SettingsTab({
   ]);
 
   const trimmedName = name.trim();
-  const quietValid = isValidClockTime(quietStart) && isValidClockTime(quietEnd);
+  // Quiet hours are optional: the server stores "" for "never quiet", so a blank
+  // field is valid input — only a half-typed time blocks the save.
+  const quietFieldValid = (value: string) => value.trim() === '' || isValidClockTime(value);
+  const quietValid = quietFieldValid(quietStart) && quietFieldValid(quietEnd);
   const dirty =
     trimmedName !== companion.name ||
     preset !== (companion.persona?.preset ?? '') ||
@@ -203,7 +207,7 @@ export function SettingsTab({
               placeholder="23:00"
               keyboardType="numbers-and-punctuation"
               maxLength={5}
-              error={isValidClockTime(quietStart) ? undefined : t('settings.quietInvalid')}
+              error={quietFieldValid(quietStart) ? undefined : t('settings.quietInvalid')}
             />
           </View>
           <View style={styles.quietField}>
@@ -214,7 +218,7 @@ export function SettingsTab({
               placeholder="08:00"
               keyboardType="numbers-and-punctuation"
               maxLength={5}
-              error={isValidClockTime(quietEnd) ? undefined : t('settings.quietInvalid')}
+              error={quietFieldValid(quietEnd) ? undefined : t('settings.quietInvalid')}
             />
           </View>
         </View>

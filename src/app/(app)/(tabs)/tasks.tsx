@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, EmptyState, ErrorState, Loading, Screen, TextField } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { SegmentedPills, type PillOption } from '@/features/tasks/components/segmented-pills';
 import { TaskCard } from '@/features/tasks/components/task-card';

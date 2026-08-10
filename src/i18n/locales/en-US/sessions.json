@@ -10,7 +10,8 @@
     "generating": "Generating",
     "waiting": "Needs review",
     "untitled": "Untitled session",
-    "createFailed": "Could not create the session: {{message}}"
+    "createFailed": "Could not create the session: {{message}}",
+    "wsOffline": "Realtime connection lost — reconnecting…"
   },
   "create": {
     "action": "New session",

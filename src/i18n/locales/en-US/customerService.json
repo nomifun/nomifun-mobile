@@ -127,7 +127,7 @@
     "deleteConfirm": "Delete this note? The agent will stop quoting it."
   },
   "dialogues": {
-    "pollHint": "Customer-service dialogues are not pushed live — pull down or revisit this page to refresh.",
+    "pollHint": "Visitor dialogues are not pushed live — pull down or tap refresh to update.",
     "emptyTitle": "No visitor dialogues yet",
     "emptyHint": "Once a bound bot receives a message from a stranger, the dialogue shows up here.",
     "visitor": "Visitor {{id}}",

@@ -30,12 +30,25 @@ export const REQUIREMENT_LIVE_TOPICS = [
   'ws.reconnected',
 ];
 
-/** Refetch every cached `/api/requirements*` key (lists, detail rows, tags). */
-export function useInvalidateRequirements(): () => void {
-  const { mutate } = useSWRConfig();
-  return useCallback(() => {
-    void mutate((key) => typeof key === 'string' && key.startsWith(REQUIREMENTS_BASE));
-  }, [mutate]);
+/**
+ * Refetch every cached `/api/requirements*` key (lists, detail rows, tags).
+ *
+ * `dropKeys` are evicted instead of revalidated — after a delete, refetching
+ * the detail key would ask the server for a row that no longer exists and log a
+ * 404 in the console.
+ */
+export function useInvalidateRequirements(): (dropKeys?: readonly string[]) => void {
+  const { mutate, cache } = useSWRConfig();
+  return useCallback(
+    (dropKeys?: readonly string[]) => {
+      const dropped = new Set(dropKeys ?? []);
+      for (const key of dropped) cache.delete(key);
+      void mutate(
+        (key) => typeof key === 'string' && key.startsWith(REQUIREMENTS_BASE) && !dropped.has(key),
+      );
+    },
+    [mutate, cache],
+  );
 }
 
 /**

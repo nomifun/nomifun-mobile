@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef } from 'react';
 import {
   FlatList,
   Platform,
-  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -14,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/api/types';
 import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/components/ui';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { Composer } from '@/features/sessions/components/composer';
 import { MessageItem } from '@/features/sessions/components/message-item';

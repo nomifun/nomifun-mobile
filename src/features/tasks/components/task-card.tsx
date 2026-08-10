@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { FontSize, Radius, Spacing } from '@/constants/theme';
@@ -14,6 +14,17 @@ interface TaskCardProps {
   onPress: () => void;
   onToggle: (enabled: boolean) => void;
 }
+
+/**
+ * On web `Pressable.onPress` is driven by the DOM `click` event, so a click on
+ * the switch bubbles to the card and opens the detail screen as a side effect
+ * of toggling. Swallow it on the switch's wrapper; React Native has no event
+ * bubbling, so this is a no-op there.
+ */
+const swallowWebClick: object =
+  Platform.OS === 'web'
+    ? { onClick: (event: { stopPropagation: () => void }) => event.stopPropagation() }
+    : {};
 
 /** One scheduled task: name, human schedule, status, next run, enable switch. */
 export function TaskCard({ job, onPress, onToggle }: TaskCardProps) {
@@ -52,12 +63,14 @@ export function TaskCard({ job, onPress, onToggle }: TaskCardProps) {
         {manual ? (
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         ) : (
-          <Switch
-            value={job.enabled}
-            onValueChange={onToggle}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            ios_backgroundColor={colors.border}
-          />
+          <View {...swallowWebClick}>
+            <Switch
+              value={job.enabled}
+              onValueChange={onToggle}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              ios_backgroundColor={colors.border}
+            />
+          </View>
         )}
       </View>
 
