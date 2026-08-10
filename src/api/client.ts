@@ -19,9 +19,20 @@ import { normalizeBaseUrl } from './utils';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** Uploads are slow and their own body-size class; give them a longer leash. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 export interface RequestOptions {
   method?: string;
   body?: unknown;
+  /**
+   * Multipart body (`POST /api/fs/upload`). Mutually exclusive with `body`:
+   * the request is sent as-is and **no `Content-Type` is set**, because only
+   * fetch itself knows the multipart boundary it generated. Auth + CSRF are
+   * unchanged; the timeout defaults to 120s instead of 30s.
+   */
+  formData?: FormData;
   /** Extra headers (e.g. Idempotency-Key on message send). */
   headers?: Record<string, string>;
   /** Override the binding (used by the login flow before a binding exists). */
@@ -45,10 +56,15 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
   const baseUrl = normalizeBaseUrl(opts.baseUrl ?? binding?.baseUrl ?? '');
   const token = opts.token ?? binding?.token;
   const csrfToken = opts.csrfToken ?? binding?.csrfToken;
-  const method = (opts.method ?? (opts.body !== undefined ? 'POST' : 'GET')).toUpperCase();
+  const hasPayload = opts.body !== undefined || opts.formData !== undefined;
+  const method = (opts.method ?? (hasPayload ? 'POST' : 'GET')).toUpperCase();
 
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  // A multipart body must keep fetch's own `multipart/form-data; boundary=…`
+  // header — setting any Content-Type here makes the server fail to parse it.
+  if (opts.formData === undefined && opts.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (token) headers.Authorization = `Bearer ${token}`;
   if (csrfToken) {
     if (Platform.OS === 'web') {
@@ -60,7 +76,8 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30_000);
+  const fallbackTimeout = opts.formData !== undefined ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? fallbackTimeout);
   if (opts.signal) {
     if (opts.signal.aborted) controller.abort();
     else opts.signal.addEventListener('abort', () => controller.abort(), { once: true });
@@ -71,7 +88,7 @@ export async function rawRequest<T = unknown>(path: string, opts: RequestOptions
     res = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.formData ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
       signal: controller.signal,
       // Same-origin cookies on web; native auth is pure Bearer.
       credentials: Platform.OS === 'web' ? 'same-origin' : 'omit',

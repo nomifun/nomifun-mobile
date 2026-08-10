@@ -16,8 +16,14 @@
     （顶层 `deny_unknown_fields`，会 400）。
   - 普通会话仍然 `extra: {}`，后端自动开临时工作区。
 - 改目录：`PATCH /api/conversations/:id {extra:{workspace:'/abs'}}`（extra 是 merge 语义）
-  - **只允许对已经是项目会话的行操作**。对临时工作区会话无效（每次读取会被
-    rebase 还原），而"顺手清 temp_workspace_id"会让该会话之后每次 GET 都 500。
+  - ~~**只允许对已经是项目会话的行操作**~~ —— 这条限制已在 2026-08-10 于服务端
+    解除：`service.update` 现在会在请求显式给出非空 `workspace` 时，把
+    `temp_workspace_id` 退休为 `retired_temp_workspace_id`（保留删除会话时回收
+    临时目录的能力），因此临时工作区会话绑定目录后**不再被读取时的 rebase 还原**。
+    手机端目前仍不给临时会话提供改绑入口，那已只是保守的产品选择（见
+    `docs/TODO.md`「可选的加固」）。
+  - 仍然**绝不要**自己发 `temp_workspace_id` / `retired_temp_workspace_id`：路由层
+    会剥离它们（实测客户端伪造值不落库），它们是服务端用来回收临时目录的令牌。
   - 改动会终止该会话的 agent runtime（下一条消息才生效）→ UI 必须提示。
 - 服务端**不校验路径存在性**、不 mkdir、不展开 `~`、不规范化。传错路径会
   「会话建成功、发第一条消息才炸」→ 所以路径必须来自 `/api/fs/browse` 的

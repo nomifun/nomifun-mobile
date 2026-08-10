@@ -135,7 +135,13 @@ export function WorkspacePanel({ conversation, onChanged }: WorkspacePanelProps)
         onClose={() => setView('closed')}
       >
         {view === 'files' ? (
-          <WorkspaceFiles conversationId={conversationId} onExit={() => setView('overview')} />
+          <WorkspaceFiles
+            conversationId={conversationId}
+            // The listing is conversation-scoped, but reading a file needs the
+            // absolute path — and the workspace root as the request's sandbox.
+            workspace={workspace}
+            onExit={() => setView('overview')}
+          />
         ) : (
           <View style={styles.overview}>
             <Card style={styles.pathCard}>

@@ -19,7 +19,8 @@
     "created": "项目会话已创建",
     "failed": "创建失败：{{message}}",
     "whitespaceTitle": "路径首尾有空格",
-    "whitespaceHint": "「{{path}}」的某一段首尾带空格，桌面端会拒绝这样的路径。请重新选择或修正目录名。"
+    "whitespaceHint": "「{{path}}」的某一段首尾带空格，桌面端会拒绝这样的路径。请重新选择或修正目录名。",
+    "recentDirectory": "最近：{{name}}"
   },
   "errors": {
     "edgeWhitespace": "路径首尾不能有空格",
@@ -57,5 +58,25 @@
     "noWorkspaceHint": "请在桌面端检查这个会话的配置。",
     "loadFailed": "无法读取项目文件",
     "depthLimit": "已到可浏览的最深层级（10 层）。"
+  },
+  "preview": {
+    "back": "返回文件列表",
+    "readOnly": "只读预览：手机端不提供编辑、保存或下载，请在桌面端修改。",
+    "meta": "共 {{lines}} 行 · {{size}}",
+    "truncated": "内容过长，只显示前 {{chars}} 个字符（文件 {{size}}）。完整内容请在桌面端查看。",
+    "refused": {
+      "binaryTitle": "无法预览这种文件",
+      "binaryHint": "看起来不是文本文件（图片、压缩包、可执行文件等）。请在桌面端打开。",
+      "tooLargeTitle": "文件太大",
+      "tooLargeHint": "这个文件有 {{size}}，超过手机预览上限 {{limit}}。请在桌面端打开。",
+      "emptyTitle": "空文件",
+      "emptyHint": "这个文件当前没有内容。"
+    },
+    "failed": {
+      "forbidden": "桌面端拒绝读取这个文件：它不在本会话工作目录的授权范围内，或当前账号不是安装所有者。",
+      "notFound": "文件已不存在，可能刚刚被移动或删除。下拉刷新看看。",
+      "unreadable": "这个文件不是 UTF-8 文本，手机端无法显示。请在桌面端打开。",
+      "unknown": "读取失败，请重试。"
+    }
   }
 }

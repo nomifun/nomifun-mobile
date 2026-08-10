@@ -22,14 +22,22 @@ import {
   cancelTurn,
   conversationPath,
   conversationsPath,
+  fetchConfirmations,
   fetchMessages,
   messagesPath,
   olderCursor,
   postMessage,
+  submitConfirmation,
   type Conversation,
   type Paginated,
   type StoredMessage,
 } from './api';
+import { buildMessageContent } from './attachments';
+import {
+  normalizeConfirmation,
+  type ConfirmationChoice,
+  type PendingConfirmation,
+} from './confirmations';
 import {
   compareMessages,
   dedupeKey,
@@ -288,8 +296,11 @@ export interface ChatSessionState {
   refresh: () => Promise<unknown>;
   retry: () => void;
   loadOlder: () => void;
-  /** Appends an optimistic bubble; throws (and rolls it back) on failure. */
-  send: (text: string) => Promise<void>;
+  /**
+   * Appends an optimistic bubble; throws (and rolls it back) on failure.
+   * `files` are absolute desktop paths from `POST /api/fs/upload`.
+   */
+  send: (text: string, files?: readonly string[]) => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -477,9 +488,14 @@ export function useChatSession(
   }, [reconcile]);
 
   const send = useCallback(
-    async (text: string) => {
-      const content = text.trim();
-      if (!conversationId || !content) return;
+    async (text: string, files: readonly string[] = []) => {
+      const trimmed = text.trim();
+      // An attachment-only turn is legitimate ("look at this"), but an empty
+      // body with nothing attached is not.
+      if (!conversationId || (!trimmed && files.length === 0)) return;
+      // The marker is what makes the attachment survive a reload — see
+      // features/sessions/attachments.ts.
+      const content = buildMessageContent(trimmed, files);
       const localKey = `local-${++localSeq}`;
       setLive((prev) => [
         ...prev,
@@ -494,7 +510,7 @@ export function useChatSession(
       ]);
       setStreaming(true);
       try {
-        const result = await postMessage(conversationId, content);
+        const result = await postMessage(conversationId, content, files);
         setLive((prev) =>
           prev.map((m) =>
             m.key === localKey
@@ -535,3 +551,119 @@ export function useChatSession(
 }
 
 export { CONVERSATION_PAGE_SIZE };
+
+// ── Tool approvals ─────────────────────────────────────────────────
+
+/** `runtime.pending_confirmations` off a turn event; `undefined` if absent. */
+function pendingConfirmationCount(payload: unknown): number | undefined {
+  if (!isRecord(payload)) return undefined;
+  const runtime = isRecord(payload.runtime) ? payload.runtime : undefined;
+  const count = runtime?.pending_confirmations ?? payload.pending_confirmations;
+  return typeof count === 'number' && Number.isFinite(count) ? count : undefined;
+}
+
+export interface PendingConfirmationsState {
+  items: PendingConfirmation[];
+  /** callId currently being submitted. */
+  submitting: string | null;
+  /** Rejects on failure so the screen can toast the server message. */
+  respond: (confirmation: PendingConfirmation, choice: ConfirmationChoice) => Promise<void>;
+}
+
+/**
+ * Live pending approvals for one conversation.
+ *
+ * Trigger sources, fastest first:
+ * - a `message.stream` frame with `type: 'acp_permission'` — the relay's
+ *   catch-all forwards the agent's confirmation verbatim, so the card can show
+ *   up before any HTTP round-trip. (`confirmation.add`/`.update` have **no
+ *   server emitter**; do not wait for them.)
+ * - `runtime.pending_confirmations` on `turn.started` / `turn.completed`.
+ * - the initial load, and `ws.reconnected` (the server never replays frames).
+ *
+ * `confirmation.remove` — which the confirm handler *does* broadcast — prunes
+ * locally, so approving on the desktop clears the phone's card too.
+ */
+export function usePendingConfirmations(
+  conversationId: string | undefined,
+): PendingConfirmationsState {
+  const [items, setItems] = useState<PendingConfirmation[]>([]);
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  /** Guards against a stale in-flight fetch landing after a chat switch. */
+  const requestId = useRef(0);
+
+  const load = useCallback(() => {
+    if (!conversationId) return;
+    const ticket = ++requestId.current;
+    void fetchConfirmations(conversationId)
+      .then((fresh) => {
+        if (ticket === requestId.current) setItems(fresh);
+      })
+      .catch(() => {
+        // A transport blip (or a 404 for a deleted conversation) must not wipe
+        // a card the user can still act on; the next trigger refetches.
+      });
+  }, [conversationId]);
+
+  const loadSoon = useDebouncedCallback(() => load(), 300);
+
+  useEffect(() => {
+    requestId.current += 1;
+    setItems([]);
+    setSubmitting(null);
+    load();
+  }, [conversationId, load]);
+
+  useWsTopic('message.stream', (payload) => {
+    if (!conversationId || conversationIdOf(payload) !== conversationId) return;
+    if (!isRecord(payload)) return;
+    if (payload.type !== 'acp_permission' && payload.type !== 'permission') return;
+    const confirmation = normalizeConfirmation(payload.data);
+    if (confirmation) {
+      setItems((prev) =>
+        prev.some((item) => item.callId === confirmation.callId)
+          ? prev.map((item) => (item.callId === confirmation.callId ? confirmation : item))
+          : [...prev, confirmation],
+      );
+    }
+    // The frame is the fast path; the GET stays authoritative (it also drops
+    // calls the agent cancelled while this one was in flight).
+    loadSoon();
+  });
+
+  useWsTopic(['turn.started', 'turn.completed'], (payload) => {
+    if (!conversationId || conversationIdOf(payload) !== conversationId) return;
+    // 0 is authoritative: the runtime waits on nothing, so a card we still hold
+    // is stale (answered on the desktop, or the turn was cancelled).
+    if (pendingConfirmationCount(payload) === 0) setItems([]);
+    else loadSoon();
+  });
+
+  useWsTopic('confirmation.remove', (payload) => {
+    if (!conversationId || conversationIdOf(payload) !== conversationId) return;
+    const id = isRecord(payload) && typeof payload.id === 'string' ? payload.id : '';
+    if (id === '') return;
+    setItems((prev) => prev.filter((item) => item.id !== id && item.callId !== id));
+  });
+
+  useWsTopic('ws.reconnected', () => load());
+
+  const respond = useCallback(
+    async (confirmation: PendingConfirmation, choice: ConfirmationChoice) => {
+      if (!conversationId) return;
+      setSubmitting(confirmation.callId);
+      try {
+        await submitConfirmation(conversationId, confirmation, choice);
+        // Drop it immediately — the agent has already been unblocked — then
+        // re-read the authoritative list (a tool can queue the next approval).
+        setItems((prev) => prev.filter((item) => item.callId !== confirmation.callId));
+        load();
+      } finally {
+        setSubmitting(null);
+      }
+    },
+    [conversationId, load],
+  );
+
+  return { items, submitting, respond };
+}

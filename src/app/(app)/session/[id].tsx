@@ -16,10 +16,17 @@ import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/compon
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { WorkspacePanel } from '@/features/projects/components/workspace-panel';
+import { useAttachments } from '@/features/sessions/attachments';
 import { Composer } from '@/features/sessions/components/composer';
+import { ConfirmationCard } from '@/features/sessions/components/confirmation-card';
 import { MessageItem } from '@/features/sessions/components/message-item';
 import { TypingIndicator } from '@/features/sessions/components/typing-indicator';
-import { useChatSession, useConversation } from '@/features/sessions/hooks';
+import type { ConfirmationChoice } from '@/features/sessions/confirmations';
+import {
+  useChatSession,
+  useConversation,
+  usePendingConfirmations,
+} from '@/features/sessions/hooks';
 import type { ChatMessage } from '@/features/sessions/stream';
 import { needsStamp, transcriptStamp } from '@/features/sessions/time';
 import { useTheme } from '@/hooks/use-theme';
@@ -56,6 +63,8 @@ export default function SessionDetailScreen() {
 
   const conversation = useConversation(id);
   const chat = useChatSession(id, conversation.data);
+  const confirmations = usePendingConfirmations(id);
+  const attachments = useAttachments(id);
 
   // Inverted keeps the newest turn pinned to the bottom for free on native.
   // react-native-web implements it with a CSS flip that reverses the mouse
@@ -83,8 +92,12 @@ export default function SessionDetailScreen() {
 
   const handleSend = useCallback(
     async (text: string) => {
+      const files = attachments.readyPaths;
       try {
-        await chat.send(text);
+        await chat.send(text, files);
+        // The paths point at the desktop's temp dir — they are single-use, so
+        // the chips go away with the send instead of being kept around.
+        if (files.length > 0) attachments.clear();
         return true;
       } catch (error) {
         toast.error(
@@ -93,7 +106,7 @@ export default function SessionDetailScreen() {
         return false;
       }
     },
-    [chat, t, tc],
+    [attachments, chat, t, tc],
   );
 
   const handleStop = useCallback(() => {
@@ -151,11 +164,50 @@ export default function SessionDetailScreen() {
     />
   );
 
+  const handleRespond = useCallback(
+    (target: (typeof confirmations.items)[number], choice: ConfirmationChoice) => {
+      void confirmations.respond(target, choice).catch((error: unknown) =>
+        toast.error(
+          t('confirmation.failed', { message: errorText(error, tc('feedback.requestFailed')) }),
+        ),
+      );
+    },
+    [confirmations, t, tc],
+  );
+
+  /**
+   * Pending approvals sit between the header and the transcript: the composer
+   * is disabled anyway while one is open (`runtime.can_send_message === false`),
+   * and covering the input would hide that fact.
+   */
+  const approvals =
+    confirmations.items.length === 0 ? null : (
+      <View>
+        {confirmations.items.map((item) => (
+          <ConfirmationCard
+            key={item.callId}
+            confirmation={item}
+            busy={confirmations.submitting === item.callId}
+            locked={confirmations.submitting !== null && confirmations.submitting !== item.callId}
+            onRespond={(choice) => handleRespond(item, choice)}
+          />
+        ))}
+      </View>
+    );
+
   const composer = (
     <Composer
       streaming={chat.streaming}
       canSend={chat.canSend}
-      disabledHint={t('detail.cannotSend')}
+      // While an approval is open the server itself reports
+      // `can_send_message: false`; say why instead of the generic "busy".
+      disabledHint={
+        confirmations.items.length > 0 ? t('confirmation.composerBlocked') : t('detail.cannotSend')
+      }
+      // An approval is raised *inside* a turn, so the transcript is still
+      // streaming while the card waits — keep the explanation on screen.
+      hintWhileStreaming={confirmations.items.length > 0}
+      attachments={attachments}
       onSend={handleSend}
       onStop={handleStop}
     />
@@ -176,6 +228,7 @@ export default function SessionDetailScreen() {
       <Screen scroll={false}>
         {header}
         {workspaceBar}
+        {approvals}
         <ErrorState
           message={errorText(chat.error, t('detail.loadFailed'))}
           onRetry={chat.retry}
@@ -191,6 +244,7 @@ export default function SessionDetailScreen() {
       <Screen scroll={false} keyboardAvoiding footer={composer}>
         {header}
         {workspaceBar}
+        {approvals}
         <EmptyState
           icon="chatbubble-ellipses-outline"
           title={t('detail.emptyTitle')}
@@ -204,6 +258,7 @@ export default function SessionDetailScreen() {
     <Screen scroll={false} keyboardAvoiding footer={composer}>
       {header}
       {workspaceBar}
+      {approvals}
       <FlatList
         ref={listRef}
         data={data}

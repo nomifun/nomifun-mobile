@@ -30,6 +30,7 @@ import {
 import { CompanionFigure } from './companion-figure';
 import { LevelBar } from './level-bar';
 import { DesktopHint, InfoRow, StatCell } from './rows';
+import { SkillsCard } from './skills-card';
 
 interface OverviewTabProps {
   companion: CompanionWithStatus;
@@ -224,41 +225,7 @@ export function OverviewTab({
         <DesktopHint text={t('overview.modelsHint')} />
       </Card>
 
-      <SectionTitle>{t('overview.skillsTitle')}</SectionTitle>
-      <Card style={styles.card}>
-        {skills.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textTertiary }]}>
-            {extras.skillsError ? t('overview.skillsFailed') : t('overview.skillsEmpty')}
-          </Text>
-        ) : (
-          skills.slice(0, 5).map((skill) => (
-            <View key={skill.companion_skill_id} style={styles.listItem}>
-              <View style={styles.listItemBody}>
-                <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>
-                  {skill.skill_name}
-                </Text>
-                <Text style={[styles.listItemMeta, { color: colors.textTertiary }]} numberOfLines={2}>
-                  {skill.description || t('overview.skillsUsage', { count: skill.usage_count })}
-                </Text>
-              </View>
-              <Tag
-                tone={
-                  skill.status === 'active'
-                    ? 'success'
-                    : skill.status === 'draft'
-                      ? 'warning'
-                      : 'neutral'
-                }
-              >
-                {t(`overview.skillStatus.${skill.status}`)}
-              </Tag>
-            </View>
-          ))
-        )}
-        {extras.skills && extras.skills.total > 5 ? (
-          <DesktopHint text={t('overview.skillsCount', { count: extras.skills.total })} />
-        ) : null}
-      </Card>
+      <SkillsCard skills={extras.skills} error={extras.skillsError} decide={extras.decideSkill} />
 
       <SectionTitle>{t('overview.robotsTitle')}</SectionTitle>
       <Card style={styles.card}>

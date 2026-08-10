@@ -82,6 +82,47 @@
     "stopFailed": "Stop failed: {{message}}",
     "stopRequested": "Stop requested"
   },
+  "attachments": {
+    "add": "Add an image",
+    "remove": "Remove {{name}}",
+    "retry": "Upload again",
+    "dismiss": "Got it",
+    "uploading": "Uploading — hold on before sending…",
+    "nativeUnsupported": "Picking images isn't available in the phone app yet — attach files from the web app or the desktop.",
+    "reject": {
+      "name": "That file has no usable name",
+      "empty": "“{{name}}” is empty, so it can't be sent",
+      "tooLarge": "“{{name}}” is over 12 MB — shrink it and try again",
+      "unsupportedImage": "The desktop can't read “{{name}}” (HEIC and friends) — convert it to PNG / JPG / WebP",
+      "notImage": "Only PNG / JPG / WebP images can be attached",
+      "tooMany": "Up to {{max}} images per message — “{{name}}” was not added",
+      "request": "“{{name}}” failed to upload — tap to retry"
+    }
+  },
+  "confirmation": {
+    "title": "Your approval is needed",
+    "choose": "Choose what to do:",
+    "allowOnce": "Allow once",
+    "allowAlways": "Allow for this session",
+    "deny": "Deny",
+    "noOptions": "This approval has no options — handle it on the desktop.",
+    "screenshotHint": "This approval comes with a page screenshot — review it on the desktop first.",
+    "failed": "Could not submit the approval: {{message}}",
+    "composerBlocked": "Answer the approval above before sending more"
+  },
+  "search": {
+    "action": "Search messages",
+    "title": "Search messages",
+    "placeholder": "Search messages in every session",
+    "clear": "Clear",
+    "idleTitle": "Search messages",
+    "idleHint": "Type a keyword to search the messages of all your sessions.",
+    "emptyTitle": "No matching messages",
+    "emptyHint": "Nothing contains “{{keyword}}” — try another keyword.",
+    "failed": "Search failed",
+    "count_one": "1 result",
+    "count_other": "{{count}} results"
+  },
   "meta": {
     "defaultModel": "Default model",
     "companion": "Companion session",

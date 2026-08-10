@@ -18,13 +18,15 @@ interface ModelRowProps {
   checking?: boolean;
   onToggle?: (enabled: boolean) => void;
   onHeartbeat?: () => void;
+  onEditTasks?: () => void;
   onDelete?: () => void;
 }
 
 /**
  * One catalog row. The desktop packs 9 controls onto a single line; on a phone
- * we keep the three that matter (enabled / heartbeat / delete) and show the
- * rest — tasks, traits, inferred-vs-user — as read-only tags.
+ * we keep the four that matter (enabled / 任务标签 / heartbeat / delete) and show
+ * the rest — traits, context limit, protocol, inferred-vs-user — as read-only
+ * tags, because those are desktop-side decisions.
  */
 export function ModelRow({
   row,
@@ -34,6 +36,7 @@ export function ModelRow({
   checking,
   onToggle,
   onHeartbeat,
+  onEditTasks,
   onDelete,
 }: ModelRowProps) {
   const { colors } = useTheme();
@@ -93,12 +96,15 @@ export function ModelRow({
       ) : null}
 
       <View style={styles.footRow}>
-        <Text style={[styles.health, { color: colors.textTertiary }]} numberOfLines={1}>
+        <Text style={[styles.health, { color: colors.textTertiary }]} numberOfLines={2}>
           {checking ? t('models.checking') : healthText}
           {health === 'unhealthy' && row.health?.error ? ` · ${row.health.error}` : ''}
         </Text>
         {readOnly ? null : (
           <View style={styles.actions}>
+            <Button small variant="secondary" disabled={busy} onPress={onEditTasks}>
+              {t('models.editTasks')}
+            </Button>
             <Button
               small
               variant="secondary"
@@ -137,13 +143,16 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   hint: { fontSize: FontSize.xs, lineHeight: 17 },
   footRow: {
+    // Wraps on narrow phones: the health line takes the full width and the
+    // three controls drop onto their own row instead of squeezing.
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
     minHeight: 36,
   },
-  health: { flex: 1, fontSize: FontSize.xs },
+  health: { flexGrow: 1, flexBasis: 140, fontSize: FontSize.xs, lineHeight: 16 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   iconButton: { width: 44, height: 36, alignItems: 'center', justifyContent: 'center' },
 });

@@ -15,6 +15,7 @@ import {
   type Conversation,
 } from '@/features/sessions/api';
 import { ProjectSection } from '@/features/sessions/components/project-section';
+import { SearchButton } from '@/features/sessions/components/search-button';
 import { SessionActions } from '@/features/sessions/components/session-actions';
 import { SessionRow } from '@/features/sessions/components/session-row';
 import { useCollapsedWorkpaths, useConversationList } from '@/features/sessions/hooks';
@@ -79,15 +80,18 @@ export default function SessionListScreen() {
   const headerOptions = useMemo(
     () => ({
       headerRight: () => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('create.action')}
-          onPress={() => void create()}
-          disabled={creating}
-          style={({ pressed }) => [styles.headerButton, { opacity: creating ? 0.4 : pressed ? 0.6 : 1 }]}
-        >
-          <Ionicons name="add" size={26} color={colors.primary} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <SearchButton />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('create.action')}
+            onPress={() => void create()}
+            disabled={creating}
+            style={({ pressed }) => [styles.headerButton, { opacity: creating ? 0.4 : pressed ? 0.6 : 1 }]}
+          >
+            <Ionicons name="add" size={26} color={colors.primary} />
+          </Pressable>
+        </View>
       ),
     }),
     [colors.primary, create, creating, t],
@@ -263,6 +267,7 @@ export default function SessionListScreen() {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: Spacing.lg },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
   wsHint: { fontSize: FontSize.xs, paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   footer: { fontSize: FontSize.xs, textAlign: 'center', paddingVertical: Spacing.lg },
   footerSpacer: { height: Spacing.lg },

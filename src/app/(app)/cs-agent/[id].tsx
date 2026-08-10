@@ -2,7 +2,7 @@
  * 客服详情 — three segments instead of the desktop's dense two-column grid:
  *
  * - 配置: 模型与知识库 (PATCHes immediately) + 身份与话术 (draft + explicit 保存)
- *   + 渠道机器人 (read-only) + 删除.
+ *   + 渠道机器人 (bind/unbind) + 删除.
  * - 笔记: FAQ / 话术 / 业务事实 CRUD.
  * - 对话: read-only visitor transcripts (poll on demand — no WS events exist).
  */
@@ -58,6 +58,9 @@ export default function CsAgentDetailScreen() {
       jobs.push(mutate(csKeys.notes(agentId)), mutate(csKeys.dialogues(agentId)));
     }
     jobs.push(mutate(csKeys.channelPlugins));
+    // The bot→agent ownership map is keyed by the roster it was built from, so
+    // invalidate it by prefix rather than guessing the current key.
+    jobs.push(mutate((key) => typeof key === 'string' && key.startsWith(csKeys.botOwners)));
     void Promise.all(jobs).finally(() => setRefreshing(false));
   };
 

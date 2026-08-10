@@ -17,7 +17,10 @@ import { hasEdgeWhitespaceSegment, isRiskyWorkspacePath } from '@/features/fs/ap
 import { DirectoryField } from '@/features/projects/components/directory-field';
 import { RiskyPathNotice } from '@/features/projects/components/risky-path-notice';
 import { workspaceErrorMessage } from '@/features/projects/errors';
-import { invalidateConversationLists } from '@/features/projects/hooks';
+import {
+  invalidateConversationLists,
+  useRecentProjectDirectories,
+} from '@/features/projects/hooks';
 import { createConversation } from '@/features/sessions/api';
 import { DEFAULT_WORKPATH_KEY, workspaceDisplayName } from '@/features/sessions/workpath';
 
@@ -52,6 +55,17 @@ export default function NewProjectSessionScreen() {
   /** Armed by the first tap on a risky path — a soft gate, not a block. */
   const [riskArmed, setRiskArmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Directories the user already runs project sessions in, offered on the
+   * picker's start screen. Derived from `GET /api/conversations` rather than
+   * remembered locally, so it matches the desktop and every other device — and
+   * only fetched while the picker is open.
+   */
+  const recentDirectories = useRecentProjectDirectories(
+    (name) => t('create.recentDirectory', { name }),
+    pickerVisible,
+  );
 
   const risky = workspace.length > 0 && isRiskyWorkspacePath(workspace);
   // The server rejects edge whitespace with a 400 only at submit time, and the
@@ -152,6 +166,7 @@ export default function NewProjectSessionScreen() {
       <DirectoryPicker
         visible={pickerVisible}
         initialPath={workspace || undefined}
+        shortcuts={recentDirectories}
         onClose={() => setPickerVisible(false)}
         onPick={handlePick}
       />

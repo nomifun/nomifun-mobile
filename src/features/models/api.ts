@@ -17,6 +17,7 @@
  */
 import { api } from '@/api/client';
 
+import { buildTasksUpdateBody } from './tasks';
 import type {
   ClientDefaults,
   CreateProviderBody,
@@ -146,6 +147,27 @@ export function setProviderModelEnabled(
 ): Promise<ProviderModelResponse> {
   return api<ProviderModelResponse>('/api/provider-models/update', {
     body: { provider_id: providerId, model, enabled },
+  });
+}
+
+/**
+ * Replace a row's task tags (模态能力).
+ *
+ * The same endpoint carries them, and sending `tasks` makes the server stamp
+ * `source: 'user'` — the row stops being re-derived from the model name. Since
+ * migration 015 the resolver reads these very rows, so this is what decides
+ * which pickers the model shows up in.
+ *
+ * `traits`, `context_limit`, `protocol`, `connection_role` and `params` are
+ * deliberately absent (= keep): those stay desktop-only edits.
+ */
+export function setProviderModelTasks(
+  providerId: string,
+  model: string,
+  tasks: readonly ModelTask[],
+): Promise<ProviderModelResponse> {
+  return api<ProviderModelResponse>('/api/provider-models/update', {
+    body: buildTasksUpdateBody(providerId, model, tasks),
   });
 }
 

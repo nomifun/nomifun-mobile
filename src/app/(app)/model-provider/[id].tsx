@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useSWRConfig } from 'swr';
 
 import {
   Button,
@@ -27,6 +28,7 @@ import {
 } from '@/features/models/api';
 import { AddModelSheet } from '@/features/models/components/add-model-sheet';
 import { ModelRow } from '@/features/models/components/model-row';
+import { ModelTasksSheet } from '@/features/models/components/model-tasks-sheet';
 import { confirmDestructive } from '@/features/models/confirm';
 import { errorMessage, isProviderInUse } from '@/features/models/errors';
 import { useProvider, useProviderModels } from '@/features/models/hooks';
@@ -50,6 +52,7 @@ export default function ProviderDetailScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
+  const { mutate: globalMutate } = useSWRConfig();
 
   const { provider, missing, error, isLoading, mutate } = useProvider(providerId);
   const {
@@ -74,6 +77,7 @@ export default function ProviderDetailScreen() {
   const [busyModel, setBusyModel] = useState('');
   const [checkingModel, setCheckingModel] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [tasksRow, setTasksRow] = useState<ProviderModelResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const managed = !!provider && isManagedProvider(provider.platform);
@@ -507,6 +511,7 @@ export default function ProviderDetailScreen() {
           checking={checkingModel === row.model}
           onToggle={(next) => void toggleModel(row, next)}
           onHeartbeat={() => void heartbeat(row)}
+          onEditTasks={() => setTasksRow(row)}
           onDelete={() => removeModel(row)}
         />
       ))}
@@ -539,6 +544,26 @@ export default function ProviderDetailScreen() {
         onAdded={() => {
           void mutateModels();
           void mutate();
+        }}
+      />
+
+      <ModelTasksSheet
+        visible={tasksRow !== null}
+        row={tasksRow}
+        onClose={() => setTasksRow(null)}
+        onSaved={(updated) => {
+          // The response IS the new row: patch it in, then revalidate the
+          // provider (its models_detail carries the same tags) and every
+          // task resolver that may now include or exclude this model.
+          void mutateModels(
+            (list) => list?.map((item) => (item.model === updated.model ? updated : item)),
+            { revalidate: false },
+          );
+          void mutateModels();
+          void mutate();
+          void globalMutate(
+            (key) => Array.isArray(key) && key[0] === '/api/model-profiles/resolve',
+          );
         }}
       />
     </Screen>

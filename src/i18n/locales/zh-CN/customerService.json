@@ -88,19 +88,28 @@
     "domainHint": "客服使用自己的渠道机器人，与桌面伙伴的渠道相互独立。",
     "groupBound": "已绑定本客服",
     "groupPool": "其他客服域机器人",
-    "boundToThis": "本客服",
     "boundToOther": "已绑客服：{{name}}",
     "otherAgent": "其他客服",
-    "unbound": "未绑定",
     "noBots": "还没有客服渠道机器人 —— 请在桌面端创建。",
     "noneBoundHere": "本客服还没有绑定机器人，访客暂时进不来。",
-    "desktopOnly": "新建、绑定与解绑请在桌面端操作。绑定后，该机器人的来访消息全部交给这位客服（陌生访客免配对码）。",
+    "desktopOnly": "绑定后，该机器人的来访消息全部交给这位客服（陌生访客免配对码）。新建机器人与填写平台凭据请在桌面端操作。",
     "status": {
       "connected": "已连接",
       "connecting": "连接中",
+      "error": "连接失败",
       "disabled": "已停用",
       "noToken": "未配置凭证"
-    }
+    },
+    "saved": "绑定已更新",
+    "notReady": "绑定关系还在加载，请稍候再试。",
+    "toggleA11y": "绑定或解绑 {{bot}}",
+    "stealTitle": "从其他客服手里抢绑？",
+    "stealBody": "「{{bot}}」当前归客服「{{from}}」。继续会把它从对方那里移走，之后该机器人的访客全部由本客服接待。",
+    "stealConfirm": "抢绑过来",
+    "unbindTitle": "解绑机器人？",
+    "unbindBody": "解绑后，「{{bot}}」上的访客消息不再由本客服回复。已产生的对话记录会保留。",
+    "unbindLastBody": "「{{bot}}」是本客服最后一个机器人。解绑后本客服将不再接待任何访客。已产生的对话记录会保留。",
+    "unbindConfirm": "解绑"
   },
   "notes": {
     "add": "新增笔记",

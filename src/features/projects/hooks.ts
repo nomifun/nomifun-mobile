@@ -9,15 +9,26 @@
  * There are no workspace WebSocket events server-side, so refreshing is
  * user-driven (pull-to-refresh / the refresh button in the browser header).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
 
+import type { Conversation, Paginated } from '@/features/sessions/api';
+import { conversationsPath } from '@/features/sessions/api';
+
 import {
-  conversationWorkspaceKey,
-  listConversationWorkspace,
+  type FileMetadata,
   type WorkspaceEntry,
+  conversationWorkspaceKey,
+  fileMetadata,
+  listConversationWorkspace,
+  readTextFile,
 } from './api';
-import { isWorkspaceDirectoryMissingError, isWorkspaceUnassignedError } from './errors';
+import {
+  type PreviewFailure,
+  isWorkspaceDirectoryMissingError,
+  isWorkspaceUnassignedError,
+  previewFailureKind,
+} from './errors';
 import {
   MAX_WORKSPACE_DEPTH,
   WORKSPACE_ROOT_PATH,
@@ -25,6 +36,14 @@ import {
   parentWorkspacePath,
   workspaceSegments,
 } from './paths';
+import {
+  type PreviewVerdict,
+  absoluteWorkspacePath,
+  classifyPreview,
+  isTextFileName,
+  truncatePreview,
+} from './preview';
+import { type DirectoryShortcut, RECENT_PROJECT_LIMIT, recentProjectShortcuts } from './recent';
 
 /**
  * Drop every cached conversation-list page after a create/rebind so the session
@@ -135,4 +154,165 @@ export function useWorkspaceBrowser(conversationId: string | undefined): Workspa
     openDirectory,
     goUp: () => setPath((current) => parentWorkspacePath(current)),
   };
+}
+
+// ── Recent project directories ─────────────────────────────────────
+
+/**
+ * The last few project directories, for the picker's start screen.
+ *
+ * Reads page one of `GET /api/conversations` (25 rows) and derives the list —
+ * see `./recent`. No local storage: the desktop is the single source of truth,
+ * so the list is identical on every device and self-heals when a project
+ * session is deleted. `enabled: false` (a closed picker) fetches nothing.
+ */
+export function useRecentProjectDirectories(
+  label: (name: string) => string,
+  enabled = true,
+  limit = RECENT_PROJECT_LIMIT,
+): DirectoryShortcut[] {
+  const { data } = useSWR<Paginated<Conversation>>(enabled ? conversationsPath() : null, {
+    revalidateOnFocus: false,
+    // Purely decorative: a failure means no shortcuts, never an error state.
+    shouldRetryOnError: false,
+  });
+  // Not memoized on purpose: `label` is an inline arrow, so any dependency list
+  // would either be wrong (stale labels) or useless (new identity every
+  // render). Deriving five shortcuts from ≤25 rows is cheaper than the ceremony,
+  // and with the picker closed there is no data to walk at all.
+  return recentProjectShortcuts(data?.items ?? [], label, limit);
+}
+
+// ── File preview ───────────────────────────────────────────────────
+
+export type FilePreviewState =
+  | { kind: 'idle' }
+  | { kind: 'loading'; name: string }
+  /** Fetched and clipped for rendering. */
+  | { kind: 'ready'; name: string; size: number; text: string; truncated: boolean; lines: number }
+  /** Deliberately not fetched (binary / too large / empty file). */
+  | { kind: 'refused'; name: string; reason: 'binary' | 'tooLarge' | 'empty'; size: number }
+  | { kind: 'failed'; name: string; reason: PreviewFailure };
+
+export interface FilePreview {
+  state: FilePreviewState;
+  /** Open the file `name` inside the currently browsed directory. */
+  open: (name: string) => void;
+  close: () => void;
+  retry: () => void;
+}
+
+/**
+ * One-shot read of a single workspace file, gated by its metadata.
+ *
+ * Deliberately not SWR: a preview must reflect the file *now* (the agent is
+ * writing into this directory while the user looks at it), and caching an
+ * inlined file body per path is exactly the wrong thing to keep in memory on a
+ * phone.
+ *
+ * Two round trips by design — `metadata` first so a binary or huge file is
+ * refused without ever transferring it (`/api/fs/read` inlines the whole file
+ * into JSON and 500s on non-UTF-8 input).
+ *
+ * `workspace` is the conversation's absolute `extra.workspace`; without it the
+ * request has no sandbox root that covers the project and every read is a 403.
+ */
+export function useFilePreview(
+  workspace: string | undefined,
+  segments: readonly string[],
+): FilePreview {
+  const [state, setState] = useState<FilePreviewState>({ kind: 'idle' });
+  /** Guards against a slow response for a file the user already navigated away from. */
+  const request = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const load = useCallback(
+    async (name: string) => {
+      if (!workspace) return;
+      const token = ++request.current;
+      const settle = (next: FilePreviewState) => {
+        if (mounted.current && request.current === token) setState(next);
+      };
+
+      // Refuse a non-text file from its *name*, before any request. The two
+      // round trips would tell us nothing new — `mime_guess` on the server does
+      // not know `.tsx`/`.toml` and calls `.ts` a video stream — and letting one
+      // through to `/api/fs/read` is a 500 (`fs::read_to_string`). Refusing here
+      // rather than in the row's `onPress` is what makes the tap answer with a
+      // reason instead of doing nothing at all.
+      if (!isTextFileName(name)) {
+        settle({ kind: 'refused', name, reason: 'binary', size: 0 });
+        return;
+      }
+
+      setState({ kind: 'loading', name });
+      const absolute = absoluteWorkspacePath(workspace, segments, name);
+      try {
+        let meta: FileMetadata | undefined;
+        try {
+          meta = await fileMetadata(absolute, workspace);
+        } catch (error) {
+          settle({ kind: 'failed', name, reason: previewFailureKind(error) });
+          return;
+        }        const verdict: PreviewVerdict = classifyPreview({
+          name,
+          size: meta.size,
+          mime: meta.type,
+          isDirectory: meta.is_directory,
+        });
+        if (verdict.kind !== 'text') {
+          settle({
+            kind: 'refused',
+            name,
+            reason: verdict.kind,
+            size: verdict.kind === 'tooLarge' ? verdict.size : meta.size,
+          });
+          return;
+        }
+        const content = await readTextFile(absolute, workspace);
+        if (content === null) {
+          // Inside the sandbox but not on disk — it went away since the listing.
+          settle({ kind: 'failed', name, reason: 'notFound' });
+          return;
+        }
+        const clipped = truncatePreview(content);
+        settle({
+          kind: 'ready',
+          name,
+          size: meta.size,
+          text: clipped.text,
+          truncated: clipped.truncated,
+          lines: clipped.lines,
+        });
+      } catch (error) {
+        settle({ kind: 'failed', name, reason: previewFailureKind(error) });
+      }
+    },
+    [segments, workspace],
+  );
+
+  const open = useCallback(
+    (name: string) => {
+      void load(name);
+    },
+    [load],
+  );
+
+  const close = useCallback(() => {
+    request.current += 1;
+    setState({ kind: 'idle' });
+  }, []);
+
+  const retry = useCallback(() => {
+    if (state.kind === 'idle') return;
+    void load(state.name);
+  }, [load, state]);
+
+  return { state, open, close, retry };
 }

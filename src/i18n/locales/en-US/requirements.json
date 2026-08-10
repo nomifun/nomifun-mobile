@@ -22,7 +22,8 @@
     "loadMore": "Load more",
     "loadedAll": "All {{count}} shown",
     "tooMany": "Showing the latest {{count}} — see the rest on desktop",
-    "wsOffline": "Realtime connection lost — refresh manually"
+    "wsOffline": "Realtime connection lost — refresh manually",
+    "selectHint": "Long-press a requirement to start selecting."
   },
   "paused": {
     "title": "Tag “{{tag}}” is paused",
@@ -104,5 +105,13 @@
     "statusChanged": "Status updated",
     "completed": "Marked done",
     "requeued": "Back in the queue"
+  },
+  "select": {
+    "count": "{{count}} selected",
+    "selectAll": "Select all",
+    "clearAll": "Clear all",
+    "deleteTitle": "Delete {{count}} requirements?",
+    "deleteBody": "These {{count}} requirements and their attachments are deleted permanently, including any that are currently running.",
+    "deleted": "Deleted {{count}} requirements"
   }
 }

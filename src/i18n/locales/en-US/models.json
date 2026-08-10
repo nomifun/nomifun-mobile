@@ -86,7 +86,7 @@
     "delete": "Delete model",
     "deleteConfirm": "Delete the model “{{model}}”?",
     "untagged": "Untagged",
-    "untaggedHint": "A model without task tags never shows up in any model picker — tag it on the desktop.",
+    "untaggedHint": "A model with no task tags never appears in any model picker — tap “Task tags” to fix that.",
     "inferred": "Inferred",
     "heartbeat": "Heartbeat",
     "checking": "Checking…",
@@ -94,7 +94,8 @@
     "unhealthy": "Unhealthy",
     "unknown": "Not checked",
     "checkFailed": "Check failed: {{message}}",
-    "tagsDesktopHint": "Task tags, context limit, protocol and advanced params are edited on the desktop."
+    "tagsDesktopHint": "Task tags are editable here; traits, context limit, protocol / connection role and the failover queue are edited on the desktop.",
+    "editTasks": "Task tags"
   },
   "task": {
     "chat": "Chat",
@@ -127,5 +128,18 @@
     "submit": "Save provider",
     "created": "Added “{{name}}”",
     "createFailed": "Add failed: {{message}}"
+  },
+  "tasksEdit": {
+    "title": "Edit task tags",
+    "hint": "Task tags decide which pickers this model shows up in (chat, speech synthesis, …). Saving marks the row as user-set, so it is no longer inferred from the model name.",
+    "emptyBlocked": "Pick at least one task: a model with no task tags cannot be selected anywhere. To remove it entirely, delete the model instead.",
+    "desktopTitle": "Edit these on the desktop",
+    "traitsRow": "Traits: {{value}}",
+    "contextRow": "Context limit: {{value}}",
+    "protocolRow": "Protocol: {{value}} · Connection role: {{role}}",
+    "desktopHint": "Traits, context limit, protocol / connection role, the failover queue and advanced params all live in the desktop model manager.",
+    "none": "Not set",
+    "default": "Default",
+    "auto": "Auto"
   }
 }

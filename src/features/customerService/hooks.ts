@@ -274,15 +274,24 @@ export interface CsBotPoolResult {
   isLoading: boolean;
   error?: Error;
   refresh: () => Promise<unknown>;
+  /**
+   * True once the ownership map is authoritative. A binding write MUST NOT be
+   * attempted before this: the PUT replaces the whole set, so writing from a
+   * half-loaded map would unbind the bots we have not seen yet.
+   */
+  ready: boolean;
+  /** Replace one agent's whole binding set (optimistic, resyncs on failure). */
+  replaceBindings: (csAgentId: string, nextIds: readonly string[]) => Promise<void>;
 }
 
 /**
  * The customer-service bot pool plus the full bot → agent ownership map, so a
  * row can be honestly labelled 绑本客服 / 已绑其他客服 / 未绑定. Building the
- * map needs one bindings request per agent; the roster is tiny and this view is
- * read-only, so we fan out on demand instead of guessing.
+ * map needs one bindings request per agent; the roster is tiny, so we fan out
+ * on demand instead of guessing.
  */
 export function useCsBotPool(): CsBotPoolResult {
+  const { mutate: globalMutate } = useSWRConfig();
   const plugins = useSWR<ChannelPluginStatus[]>(
     csKeys.channelPlugins,
     csApi.listChannelPlugins,
@@ -328,6 +337,33 @@ export function useCsBotPool(): CsBotPoolResult {
     [agents, owners, plugins],
   );
 
+  const replaceBindings = useCallback(
+    async (csAgentId: string, nextIds: readonly string[]) => {
+      const ids = [...nextIds];
+      // Optimistic: this agent owns exactly `ids`, and every id it took is
+      // removed from its previous owner — that is what the server does.
+      void owners.mutate(
+        (current) =>
+          current?.map((entry) =>
+            entry.agentId === csAgentId
+              ? { ...entry, pluginIds: ids }
+              : { ...entry, pluginIds: entry.pluginIds.filter((id) => !ids.includes(id)) },
+          ),
+        { revalidate: false },
+      );
+      try {
+        await csApi.replaceBindings(csAgentId, ids);
+        void owners.mutate();
+        void globalMutate(csKeys.bindings(csAgentId));
+      } catch (error) {
+        // A rejected PUT writes nothing; re-read so the switches never lie.
+        void owners.mutate();
+        throw error;
+      }
+    },
+    [globalMutate, owners],
+  );
+
   return {
     bots,
     ownerByBot,
@@ -335,5 +371,13 @@ export function useCsBotPool(): CsBotPoolResult {
     isLoading: plugins.isLoading || agents.isLoading || owners.isLoading,
     error: errorOf(plugins.error ?? agents.error ?? owners.error),
     refresh,
+    ready:
+      // Every input of the ownership map must be loaded: an unloaded roster
+      // would produce an EMPTY map, and a toggle written from that map would
+      // PUT a single id — silently unbinding everything else.
+      plugins.data !== undefined &&
+      agents.data !== undefined &&
+      (agentIds.length === 0 || owners.data !== undefined),
+    replaceBindings,
   };
 }

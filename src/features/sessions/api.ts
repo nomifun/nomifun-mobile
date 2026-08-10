@@ -11,6 +11,13 @@
  */
 import { api } from '@/api/client';
 
+import {
+  confirmBody,
+  normalizeConfirmations,
+  type ConfirmationChoice,
+  type PendingConfirmation,
+} from './confirmations';
+
 // ── Conversation row ───────────────────────────────────────────────
 
 /** `{provider_id, model, use_model?}` — the nomi model reference on a row. */
@@ -277,17 +284,54 @@ export function newIdempotencyKey(): string {
   return out.slice(0, 32);
 }
 
+/**
+ * `{content, files?}` + a per-attempt `Idempotency-Key` header.
+ *
+ * `files` are **absolute paths on the desktop machine** (what
+ * `POST /api/fs/upload` returned); the key is omitted entirely when there are
+ * no attachments, keeping the body to the documented minimum.
+ */
 export function postMessage(
   conversationId: string,
   content: string,
+  files: readonly string[] = [],
   idempotencyKey = newIdempotencyKey(),
 ): Promise<SendMessageResult> {
   return api<SendMessageResult>(`${conversationPath(conversationId)}/messages`, {
-    body: { content },
+    body: files.length > 0 ? { content, files: [...files] } : { content },
     headers: { 'Idempotency-Key': idempotencyKey },
   });
 }
 
 export function cancelTurn(conversationId: string): Promise<unknown> {
   return api<unknown>(`${conversationPath(conversationId)}/cancel`, { method: 'POST' });
+}
+
+// ── Tool approvals ─────────────────────────────────────────────────
+
+export function confirmationsPath(conversationId: string): string {
+  return `${conversationPath(conversationId)}/confirmations`;
+}
+
+/** `[]` when the conversation has no live runtime — never an error. */
+export async function fetchConfirmations(conversationId: string): Promise<PendingConfirmation[]> {
+  return normalizeConfirmations(await api<unknown>(confirmationsPath(conversationId)));
+}
+
+/**
+ * Approve or deny one pending call: `{msg_id, data: {value}, always_allow}`.
+ *
+ * The body carries the option's **value**, never its label, and `always_allow`
+ * is derived from that same option — see `confirmations.ts` for why both
+ * matter (a lost value reads as approval on the agent side).
+ */
+export function submitConfirmation(
+  conversationId: string,
+  confirmation: PendingConfirmation,
+  choice: ConfirmationChoice,
+): Promise<unknown> {
+  return api<unknown>(
+    `${confirmationsPath(conversationId)}/${encodeURIComponent(confirmation.callId)}/confirm`,
+    { body: confirmBody(confirmation, choice) },
+  );
 }

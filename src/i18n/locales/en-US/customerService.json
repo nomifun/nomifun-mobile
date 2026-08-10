@@ -88,19 +88,28 @@
     "domainHint": "Customer service has its own channel bots, fully separate from companion channels.",
     "groupBound": "Bound to this agent",
     "groupPool": "Other customer-service bots",
-    "boundToThis": "This agent",
     "boundToOther": "Bound to {{name}}",
     "otherAgent": "another agent",
-    "unbound": "Unbound",
     "noBots": "No customer-service bots yet — create one on the desktop.",
     "noneBoundHere": "No bot is bound to this agent, so visitors cannot reach it.",
-    "desktopOnly": "Create, bind and unbind on the desktop. Once bound, every visitor message on that bot goes to this agent (strangers need no pairing code).",
+    "desktopOnly": "Once bound, every visitor message on that bot goes to this agent (strangers need no pairing code). Creating bots and entering platform credentials stays on the desktop.",
     "status": {
       "connected": "Connected",
       "connecting": "Connecting",
+      "error": "Connection failed",
       "disabled": "Disabled",
       "noToken": "No credentials"
-    }
+    },
+    "saved": "Bindings updated",
+    "notReady": "Bindings are still loading — try again in a moment.",
+    "toggleA11y": "Bind or unbind {{bot}}",
+    "stealTitle": "Take this bot from another agent?",
+    "stealBody": "“{{bot}}” currently belongs to “{{from}}”. Continuing moves it away from that agent, and its visitors will be served by this agent instead.",
+    "stealConfirm": "Take it",
+    "unbindTitle": "Unbind this bot?",
+    "unbindBody": "After unbinding, visitor messages on “{{bot}}” are no longer answered by this agent. Existing dialogues are kept.",
+    "unbindLastBody": "“{{bot}}” is this agent’s last bot. After unbinding it, the agent will serve no visitors at all. Existing dialogues are kept.",
+    "unbindConfirm": "Unbind"
   },
   "notes": {
     "add": "New note",

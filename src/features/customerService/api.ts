@@ -8,7 +8,8 @@
  * - PATCH agent: `provider_id` / `model` are double-Option (absent = keep,
  *   null = clear). Bodies come from `buildAgentPatchBody`, never from a spread.
  * - PUT bindings is a FULL-SET replacement and it *steals* a bot from another
- *   agent. Mobile is read-only here, so it is intentionally not exposed.
+ *   agent. Callers must send "currently bound ± one" (see `bindings.ts`), never
+ *   a single id, or every other bot of the agent is silently unbound.
  * - Note *scope* (`cs_agent_id` null-or-not) has no PATCH path — immutable
  *   after creation.
  */
@@ -71,10 +72,30 @@ export async function deleteAgent(csAgentId: string): Promise<void> {
   await api<unknown>(`/api/customer-service/agents/${csAgentId}`, { method: 'DELETE' });
 }
 
-// ── bindings (read-only on mobile) ────────────────────────────────────
+// ── bindings ──────────────────────────────────────────────────────────
 
 export async function listBindings(csAgentId: string): Promise<CsChannelBinding[]> {
   const rows = await api<unknown>(`/api/customer-service/agents/${csAgentId}/bindings`);
+  return asArray(rows).map(normalizeCsBinding);
+}
+
+/**
+ * Replace this agent's WHOLE binding set.
+ *
+ * The route validates every id first (unknown plugin → 400 `channel plugin
+ * '…' not found`; companion-domain plugin → 400) and writes nothing when it
+ * rejects. A listed bot owned by another customer-service agent is re-bound to
+ * this one; `[]` unbinds everything. Build the argument with
+ * `planBindingChange` so those semantics stay explicit at the call site.
+ */
+export async function replaceBindings(
+  csAgentId: string,
+  channelPluginIds: readonly string[],
+): Promise<CsChannelBinding[]> {
+  const rows = await api<unknown>(`/api/customer-service/agents/${csAgentId}/bindings`, {
+    method: 'PUT',
+    body: { channel_plugin_ids: [...channelPluginIds] },
+  });
   return asArray(rows).map(normalizeCsBinding);
 }
 

@@ -107,6 +107,8 @@ export interface ChannelPluginStatus {
   name: string;
   enabled: boolean;
   connected: boolean;
+  /** Runtime lifecycle phase: `created`…`running`, or `error` after a failed handshake. */
+  status?: string;
   hasToken?: boolean;
   botUsername?: string;
   activeUsers?: number;

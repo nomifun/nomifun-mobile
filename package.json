@@ -50,6 +50,11 @@
     "ios": "expo start --ios",
     "proxy": "node scripts/dev-proxy.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check": "bun run typecheck && bun test && bun run check:i18n",
+    "e2e": "node e2e/smoke.mjs",
+    "e2e:project": "node e2e/project-session.mjs",
     "lint": "expo lint",
     "export:web": "expo export -p web"
   },

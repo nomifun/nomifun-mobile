@@ -19,7 +19,8 @@
     "created": "Project session created",
     "failed": "Could not create: {{message}}",
     "whitespaceTitle": "Path has edge whitespace",
-    "whitespaceHint": "A segment of “{{path}}” starts or ends with a space; the desktop rejects such paths. Pick the directory again or rename it."
+    "whitespaceHint": "A segment of “{{path}}” starts or ends with a space; the desktop rejects such paths. Pick the directory again or rename it.",
+    "recentDirectory": "Recent: {{name}}"
   },
   "errors": {
     "edgeWhitespace": "Path segments cannot start or end with a space",
@@ -57,5 +58,25 @@
     "noWorkspaceHint": "Check the conversation's configuration on the desktop.",
     "loadFailed": "Could not read the project files",
     "depthLimit": "Deepest browsable level reached (10 levels)."
+  },
+  "preview": {
+    "back": "Back to the file list",
+    "readOnly": "Read-only preview: the phone cannot edit, save or download — use the desktop for that.",
+    "meta": "{{lines}} lines · {{size}}",
+    "truncated": "Too long to show in full — first {{chars}} characters only (file is {{size}}). Open it on the desktop for the rest.",
+    "refused": {
+      "binaryTitle": "This file cannot be previewed",
+      "binaryHint": "It does not look like text (an image, archive, binary…). Open it on the desktop.",
+      "tooLargeTitle": "File too large",
+      "tooLargeHint": "This file is {{size}}, over the {{limit}} phone preview limit. Open it on the desktop.",
+      "emptyTitle": "Empty file",
+      "emptyHint": "There is nothing in this file right now."
+    },
+    "failed": {
+      "forbidden": "The desktop refused to read this file: it is outside this conversation's working directory, or this account is not the installation owner.",
+      "notFound": "The file is gone — it was probably just moved or deleted. Pull to refresh.",
+      "unreadable": "This file is not UTF-8 text, so the phone cannot display it. Open it on the desktop.",
+      "unknown": "Could not read the file. Try again."
+    }
   }
 }

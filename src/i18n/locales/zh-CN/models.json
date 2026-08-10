@@ -86,7 +86,7 @@
     "delete": "删除模型",
     "deleteConfirm": "删除模型「{{model}}」？",
     "untagged": "未标注",
-    "untaggedHint": "没有任务标签的模型不会出现在任何模型选择器里，请在桌面端补标注。",
+    "untaggedHint": "没有任务标签的模型不会出现在任何模型选择器里，点「任务标签」补上。",
     "inferred": "系统推断",
     "heartbeat": "心跳",
     "checking": "检测中…",
@@ -94,7 +94,8 @@
     "unhealthy": "不可用",
     "unknown": "未检测",
     "checkFailed": "检测失败：{{message}}",
-    "tagsDesktopHint": "任务标注、上下文长度、协议与高级参数请在桌面端调整。"
+    "tagsDesktopHint": "任务标签可在此处编辑；模态特性、上下文长度、协议/连接角色与故障转移队列请在桌面端调整。",
+    "editTasks": "任务标签"
   },
   "task": {
     "chat": "对话",
@@ -127,5 +128,18 @@
     "submit": "保存供应商",
     "created": "已添加「{{name}}」",
     "createFailed": "添加失败：{{message}}"
+  },
+  "tasksEdit": {
+    "title": "编辑任务标签",
+    "hint": "任务标签决定这个模型会出现在哪些选择器里（如对话、语音合成）。保存后标记为「用户设定」，不再被系统按模型名推断覆盖。",
+    "emptyBlocked": "至少选择一个任务：没有任务标签的模型在任何地方都不可选。若要彻底移除，请直接删除该模型。",
+    "desktopTitle": "以下项目请在桌面端调整",
+    "traitsRow": "模态特性：{{value}}",
+    "contextRow": "上下文长度：{{value}}",
+    "protocolRow": "协议：{{value}} · 连接角色：{{role}}",
+    "desktopHint": "模态特性、上下文长度、协议/连接角色、故障转移队列与高级参数都在桌面端「模型管理」里。",
+    "none": "未设置",
+    "default": "默认",
+    "auto": "自动"
   }
 }

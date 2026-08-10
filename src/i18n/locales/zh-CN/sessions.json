@@ -82,6 +82,47 @@
     "stopFailed": "停止失败：{{message}}",
     "stopRequested": "已请求停止"
   },
+  "attachments": {
+    "add": "添加图片",
+    "remove": "移除 {{name}}",
+    "retry": "重新上传",
+    "dismiss": "知道了",
+    "uploading": "图片上传中，稍等一下再发送…",
+    "nativeUnsupported": "手机 App 暂不支持选图，请在网页版或桌面端添加附件。",
+    "reject": {
+      "name": "这个文件没有可用的文件名",
+      "empty": "「{{name}}」是空文件，发不出去",
+      "tooLarge": "「{{name}}」超过 12 MB，请压缩后再试",
+      "unsupportedImage": "「{{name}}」的格式桌面端不支持（比如 HEIC），请转成 PNG / JPG / WebP",
+      "notImage": "只能添加 PNG / JPG / WebP 图片",
+      "tooMany": "一条消息最多带 {{max}} 张图片，「{{name}}」没加上",
+      "request": "「{{name}}」上传失败，点一下重试"
+    }
+  },
+  "confirmation": {
+    "title": "需要你确认",
+    "choose": "选择如何处理：",
+    "allowOnce": "允许这一次",
+    "allowAlways": "本次会话内一直允许",
+    "deny": "拒绝",
+    "noOptions": "这条审批没有可选项，请在桌面端处理。",
+    "screenshotHint": "该审批附带页面截图，请在桌面端查看后再决定。",
+    "failed": "提交审批失败：{{message}}",
+    "composerBlocked": "先处理上方的审批，再继续发消息"
+  },
+  "search": {
+    "action": "搜索消息",
+    "title": "搜索消息",
+    "placeholder": "搜索所有会话里的消息",
+    "clear": "清空",
+    "idleTitle": "搜索消息",
+    "idleHint": "输入关键词，会在你所有会话的消息里查找。",
+    "emptyTitle": "没有匹配的消息",
+    "emptyHint": "没有包含「{{keyword}}」的消息，换个关键词试试。",
+    "failed": "搜索失败",
+    "count_one": "共 {{count}} 条结果",
+    "count_other": "共 {{count}} 条结果"
+  },
   "meta": {
     "defaultModel": "默认模型",
     "companion": "伙伴会话",

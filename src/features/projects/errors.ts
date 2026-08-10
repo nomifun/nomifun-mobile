@@ -54,3 +54,27 @@ export function workspaceErrorMessage(
   if (isNotInstallOwnerError(err)) return labels.notOwner;
   return message(err) || labels.fallback;
 }
+
+/** Why a file preview could not be produced — one i18n key each. */
+export type PreviewFailure = 'forbidden' | 'unreadable' | 'notFound' | 'unknown';
+
+/**
+ * Classify a `/api/fs/metadata` or `/api/fs/read` failure.
+ *
+ * - 403 — outside the request's sandbox (`allowed_roots ∪ workspace`, so a
+ *   symlink pointing out of the project), or the account is not the install
+ *   owner. Either way the phone cannot fix it.
+ * - 400 / 404 — `canonicalize` failed: gone since the listing, or a broken
+ *   symlink. Not an error worth a red banner.
+ * - 500 `cannot read file` — the server reads with `fs::read_to_string`, so
+ *   this is a non-UTF-8 file that slipped past the extension gate.
+ */
+export function previewFailureKind(err: unknown): PreviewFailure {
+  if (!(err instanceof ApiError)) return 'unknown';
+  if (err.status === 403) return 'forbidden';
+  if (err.status === 400 || err.status === 404) return 'notFound';
+  if (err.status >= 500 && /cannot read file|invalid utf|stream did not contain/i.test(err.message)) {
+    return 'unreadable';
+  }
+  return 'unknown';
+}

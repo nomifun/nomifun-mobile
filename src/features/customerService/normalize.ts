@@ -174,6 +174,10 @@ export function normalizeChannelPluginStatus(raw: unknown): ChannelPluginStatus 
     hasToken: typeof hasToken === 'boolean' ? hasToken : undefined,
     botUsername: asNullableText(botUsername) ?? undefined,
     activeUsers: asInt(activeUsers, 0),
+    // Runtime lifecycle phase (`created`…`running`, `error`). Kept as a plain
+    // string: the mobile UI only distinguishes `error`, and a server that grows
+    // a new phase must not break normalization here.
+    status: asNullableText(status.status) ?? undefined,
     // Transitional: a server that does not report the domain means 'companion'
     // (matches the DB `DEFAULT 'companion'`).
     owner_domain: status.owner_domain === 'customer_service' ? 'customer_service' : 'companion',
@@ -277,13 +281,24 @@ export function csBotBindingState(
   return { kind: 'boundToOther', csAgentId: owner };
 }
 
-export type BotStatusKey = 'noToken' | 'disabled' | 'connected' | 'connecting';
+export type BotStatusKey = 'noToken' | 'disabled' | 'error' | 'connected' | 'connecting';
 
-/** Connection state of one bot, derived from hasToken / enabled / connected. */
+/**
+ * Connection state of one bot, derived from hasToken / enabled / status /
+ * connected.
+ *
+ * `status === 'error'` has to be its own key: the runtime parks a bot there when
+ * the handshake failed for good (a revoked or mistyped token makes Telegram's
+ * `getMe` answer 401), and `connected` stays false forever after. Folding that
+ * into `connecting` would promise a connection that is never coming, which is
+ * exactly the case a phone user needs to see. `noToken` and `disabled` still win
+ * — both are more actionable, and a disabled bot's stored `error` is stale.
+ */
 export function botStatusKey(status: ChannelPluginStatus): BotStatusKey {
   if (status.hasToken === false) return 'noToken';
   if (!status.enabled) return 'disabled';
-  return status.connected ? 'connected' : 'connecting';
+  if (status.connected) return 'connected';
+  return status.status === 'error' ? 'error' : 'connecting';
 }
 
 /**

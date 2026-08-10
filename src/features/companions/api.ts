@@ -8,6 +8,7 @@
  */
 import { api } from '@/api/client';
 
+import { decideSkillBody } from './skills';
 import type {
   CompanionLearnResult,
   CompanionMemory,
@@ -15,6 +16,7 @@ import type {
   CompanionProfile,
   CompanionProfilePatch,
   CompanionSharedConfig,
+  CompanionSkill,
   CompanionSkillPage,
   CompanionThread,
   CompanionWeeklyDigest,
@@ -94,6 +96,27 @@ export const runLearnPass = (id: string) =>
 export const fetchWeeklyDigest = (id: string) => api<CompanionWeeklyDigest>(weeklyDigestKey(id));
 
 export const fetchSkills = (id: string) => api<CompanionSkillPage>(skillsKey(id));
+
+/**
+ * Draft approval: `POST …/skills/{companion_skill_id}/decide` with
+ * `{accept, reason?}`.
+ *
+ * accept=true  → the draft is promoted (`active`) and `companion.skill-learned`
+ *                fires;
+ * accept=false → the draft is archived, a rejection feedback row is written
+ *                with the optional reason, and the pattern behind it is marked
+ *                `rejected` so it stops being re-proposed.
+ * Deciding a row that is no longer a draft returns it unchanged (idempotent).
+ */
+export const decideCompanionSkill = (
+  companionId: string,
+  companionSkillId: string,
+  accept: boolean,
+  reason?: string,
+) =>
+  api<CompanionSkill>(`${companionKey(companionId)}/skills/${companionSkillId}/decide`, {
+    body: decideSkillBody(accept, reason),
+  });
 
 // ── Memory ─────────────────────────────────────────────────────────────────
 

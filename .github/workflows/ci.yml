@@ -1,0 +1,51 @@
+# Quality gate for nomifun-mobile.
+#
+# NOTE: this repository has no git remote yet (it is developed locally and the
+# desktop app is the product). The workflow is committed so that the day it is
+# pushed to GitHub the gate is already there — nothing here has ever run on a
+# GitHub runner, so treat the first run as a shakedown.
+#
+# What runs: exactly the three checks that need no desktop backend.
+#   - `bun run typecheck`  — tsc --noEmit over app + tests
+#   - `bun test`           — pure-function unit tests (bun's own runner)
+#   - `bun run check:i18n` — zh-CN/en-US key + placeholder parity, missing keys
+#
+# What does NOT run: `e2e/*` (needs a running nomifun desktop app, a browser and
+# a real filesystem — see docs/TESTING.md) and any native build (Android/iOS are
+# built with EAS, not here).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # `--frozen-lockfile` so CI fails loudly on a lockfile that does not match
+      # package.json instead of silently resolving something else.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Unit tests
+        run: bun test
+
+      - name: i18n consistency
+        run: bun run check:i18n

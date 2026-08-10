@@ -17,11 +17,13 @@ import {
   ROSTER_KEY,
   SHARED_CONFIG_KEY,
   companionKey,
+  decideCompanionSkill,
   memoriesKey,
   skillsKey,
   weeklyDigestKey,
   type MemoryQuery,
 } from './api';
+import { applySkillDecision } from './skills';
 import type {
   CompanionMemoryPage,
   CompanionSharedConfig,
@@ -195,10 +197,35 @@ export function useCompanionExtras(companionId: string) {
     [digest, skills, robots, statuses],
   );
 
+  /**
+   * Draft approval. Optimistic (the row flips to active/archived immediately),
+   * then authoritative: on success we refetch because the server also moves the
+   * SKILL.md tree and touches the digest; on failure we refetch so a rejected
+   * write can never leave a lying row on screen.
+   */
+  const decideSkill = useCallback(
+    async (companionSkillId: string, accept: boolean, reason?: string) => {
+      void skills.mutate(
+        (current) => (current ? applySkillDecision(current, companionSkillId, accept) : current),
+        { revalidate: false },
+      );
+      try {
+        await decideCompanionSkill(companionId, companionSkillId, accept, reason);
+        void skills.mutate();
+        void digest.mutate();
+      } catch (error) {
+        void skills.mutate();
+        throw error;
+      }
+    },
+    [companionId, digest, skills],
+  );
+
   return {
     digest: digest.data,
     skills: skills.data,
     skillsError: skills.error as unknown,
+    decideSkill,
     boundRobots,
     robotsError: robots.error as unknown,
     phases,

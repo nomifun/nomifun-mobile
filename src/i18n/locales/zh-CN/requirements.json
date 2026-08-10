@@ -22,7 +22,8 @@
     "loadMore": "加载更多",
     "loadedAll": "已显示全部 {{count}} 条",
     "tooMany": "仅显示最近 {{count}} 条，更多请在桌面端查看",
-    "wsOffline": "实时连接已断开，可手动刷新"
+    "wsOffline": "实时连接已断开，可手动刷新",
+    "selectHint": "长按需求可进入多选。"
   },
   "paused": {
     "title": "标签「{{tag}}」已暂停",
@@ -104,5 +105,13 @@
     "statusChanged": "状态已更新",
     "completed": "已标记完成",
     "requeued": "已重新排队"
+  },
+  "select": {
+    "count": "已选 {{count}} 项",
+    "selectAll": "全选",
+    "clearAll": "取消全选",
+    "deleteTitle": "删除 {{count}} 条需求？",
+    "deleteBody": "这 {{count}} 条需求及其附件会被永久删除；正在执行中的需求也会一并删除。",
+    "deleted": "已删除 {{count}} 条需求"
   }
 }

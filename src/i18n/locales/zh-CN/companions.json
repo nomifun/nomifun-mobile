@@ -101,7 +101,7 @@
     "skillsEmpty": "还没有技能",
     "skillsFailed": "读取技能失败",
     "skillsUsage": "用过 {{count}} 次",
-    "skillsCount": "共 {{count}} 个技能，完整列表与草稿审阅在桌面端。",
+    "skillsCount": "共 {{count}} 个技能，完整列表与 SKILL.md 内容请在桌面端查看。",
     "skillStatus": {
       "draft": "草稿",
       "active": "已启用",
@@ -113,7 +113,20 @@
     "robotsHint": "绑定与解绑请在桌面端完成。",
     "robotBoard": "板型 {{board}}",
     "robotLastSeen": "最近在线 {{time}}",
-    "robotNeverSeen": "还没连上过"
+    "robotNeverSeen": "还没连上过",
+    "skillDraftsTitle": "待确认技能草稿 · {{count}}",
+    "skillDraftsHint": "伙伴自己总结出来的新技能，采纳后才会真正启用。",
+    "skillAccept": "采纳",
+    "skillReject": "拒绝",
+    "skillAccepted": "已采纳「{{name}}」",
+    "skillRejected": "已拒绝「{{name}}」",
+    "skillDecideFailed": "操作失败，请重试",
+    "skillConfidence": "置信度 {{percent}}%",
+    "skillRejectTitle": "拒绝这个技能草稿？",
+    "skillRejectBody": "拒绝后草稿会被归档、不再启用，伙伴也不会再从同一规律里重复提出它。此操作不可撤销，但你随后仍可在桌面端手动创建技能。",
+    "skillRejectReasonLabel": "拒绝原因（可选）",
+    "skillRejectReasonHint": "写下原因能帮伙伴以后少提类似的技能。",
+    "skillRejectConfirm": "确认拒绝"
   },
   "memory": {
     "searchPlaceholder": "搜索记忆…",

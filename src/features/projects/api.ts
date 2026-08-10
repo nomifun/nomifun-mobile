@@ -78,3 +78,51 @@ export function patchConversationWorkspace(
     body: { extra: { workspace } },
   });
 }
+
+// ── File preview (`/api/fs/metadata` + `/api/fs/read`) ─────────────
+
+export const FS_METADATA_PATH = '/api/fs/metadata';
+export const FS_READ_PATH = '/api/fs/read';
+
+/** `POST /api/fs/metadata` response (snake_case, `type` is the guessed MIME). */
+export interface FileMetadata {
+  name: string;
+  path: string;
+  /** Bytes. */
+  size: number;
+  /** Extension-guessed MIME; `application/octet-stream` when unknown. */
+  type: string;
+  last_modified: number;
+  is_directory?: boolean;
+}
+
+/**
+ * `POST /api/fs/metadata {path, workspace}` — size + guessed MIME of one file.
+ *
+ * `workspace` is the reason this works at all: the handler appends it to the
+ * `allowed_roots` sandbox **for this request only**, so a project directory
+ * outside the backend data dir becomes readable (`base_authority` in
+ * `nomifun-file/src/service.rs`). Without it every project file answers 403.
+ * Both fields are the complete body — the DTO is `deny_unknown_fields`.
+ *
+ * Failure modes: 403 outside the sandbox (or non-owner account), 400 when the
+ * path cannot be resolved, 404 when metadata cannot be read.
+ */
+export function fileMetadata(path: string, workspace: string): Promise<FileMetadata> {
+  return api<FileMetadata>(FS_METADATA_PATH, { body: { path, workspace } });
+}
+
+/**
+ * `POST /api/fs/read {path, workspace}` — whole file as UTF-8 text.
+ *
+ * Returns `null` when the path is inside the sandbox but not on disk (the
+ * server models "allowed but missing" as `data: null`, not as a 404).
+ *
+ * Two traps the caller must handle *before* calling: the server reads with
+ * `fs::read_to_string`, so a non-UTF-8 file is a **500**, and its own size
+ * ceiling is 256 MB, which is no protection for a phone — the whole file is
+ * inlined into one JSON response. `classifyPreview` in `./preview` gates both.
+ */
+export function readTextFile(path: string, workspace: string): Promise<string | null> {
+  return api<string | null>(FS_READ_PATH, { body: { path, workspace } });
+}

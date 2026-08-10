@@ -104,6 +104,23 @@ export function deleteRequirement(requirementId: string): Promise<unknown> {
   return api<unknown>(requirementKey(requirementId), { method: 'DELETE' });
 }
 
+/**
+ * POST /api/requirements/batch-delete — `{requirement_ids}` → `{deleted: N}`.
+ *
+ * The body is `deny_unknown_fields` and the ids must be bare UUIDv7 strings
+ * (the server rejects numbers and prefixed forms); an empty array is a 400.
+ * Deletion has no status guard — an `in_progress` row is deleted too, and each
+ * row emits `requirement.deleted` — so the caller must confirm first. Ids that
+ * no longer exist are skipped and simply not counted in `deleted`.
+ */
+export function batchDeleteRequirements(
+  requirementIds: readonly string[],
+): Promise<{ deleted: number }> {
+  return api<{ deleted: number }>(`${REQUIREMENTS_BASE}/batch-delete`, {
+    body: { requirement_ids: [...requirementIds] },
+  });
+}
+
 export function fetchRequirements(
   params: ListRequirementsParams = {},
 ): Promise<PaginatedResult<Requirement>> {

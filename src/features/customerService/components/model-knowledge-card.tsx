@@ -146,7 +146,7 @@ export function ModelKnowledgeCard({
         visible={picker === 'knowledge'}
         multiple
         title={t('fields.knowledgeBases')}
-        subtitle={t('fields.knowledgeBasesPlaceholder')}
+        subtitle={t('detail.knowledgeBasesPlaceholder')}
         items={knowledge.bases.map((base) => ({
           id: base.knowledge_base_id,
           title: base.name,

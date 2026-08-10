@@ -101,7 +101,7 @@
     "skillsEmpty": "No skills yet",
     "skillsFailed": "Failed to load skills",
     "skillsUsage": "Used {{count}} times",
-    "skillsCount": "{{count}} skills in total — the full list and draft review are on the desktop.",
+    "skillsCount": "{{count}} skills in total — the full list and SKILL.md bodies are on the desktop.",
     "skillStatus": {
       "draft": "Draft",
       "active": "Active",
@@ -113,7 +113,20 @@
     "robotsHint": "Binding and unbinding are done on the desktop.",
     "robotBoard": "Board {{board}}",
     "robotLastSeen": "Last seen {{time}}",
-    "robotNeverSeen": "Never connected"
+    "robotNeverSeen": "Never connected",
+    "skillDraftsTitle": "Drafts awaiting review · {{count}}",
+    "skillDraftsHint": "Skills the companion drafted by itself. They only take effect once accepted.",
+    "skillAccept": "Accept",
+    "skillReject": "Reject",
+    "skillAccepted": "Accepted “{{name}}”",
+    "skillRejected": "Rejected “{{name}}”",
+    "skillDecideFailed": "Action failed — try again",
+    "skillConfidence": "Confidence {{percent}}%",
+    "skillRejectTitle": "Reject this draft skill?",
+    "skillRejectBody": "The draft is archived and never activated, and the companion stops proposing it from the same pattern again. This cannot be undone, but you can still create the skill by hand on the desktop.",
+    "skillRejectReasonLabel": "Reason (optional)",
+    "skillRejectReasonHint": "A reason helps the companion propose fewer skills like this one.",
+    "skillRejectConfirm": "Reject draft"
   },
   "memory": {
     "searchPlaceholder": "Search memories…",

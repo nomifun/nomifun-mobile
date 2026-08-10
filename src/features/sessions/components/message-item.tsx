@@ -8,6 +8,7 @@ import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import type { ToolCallContent } from '../api';
+import { baseName, parseMessageContent } from '../attachments';
 import { textBody, thinkingBody, tipsBody, toolEntries, type ChatMessage } from '../stream';
 import { markdownStyles } from './markdown-styles';
 
@@ -30,11 +31,17 @@ export const MessageItem = memo(function MessageItem({ message }: MessageItemPro
 function TextBubble({ message }: MessageItemProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('sessions');
-  const body = textBody(message.content);
+  const raw = textBody(message.content);
   const isUser = message.position === 'right';
   const isSystem = message.position === 'center' || message.position === 'pop';
+  // Only user text may carry the attachment marker. Decoding it on assistant
+  // output would let a model fake attachment chips for files nobody sent —
+  // the desktop gates on position for the same reason.
+  const { text: body, files } = isUser
+    ? parseMessageContent(raw)
+    : { text: raw, files: [] as string[] };
 
-  if (!body.trim()) return null;
+  if (!body.trim() && files.length === 0) return null;
 
   if (isSystem) {
     return (
@@ -60,7 +67,21 @@ function TextBubble({ message }: MessageItemProps) {
           message.pending ? styles.pending : null,
         ]}
       >
-        <Markdown style={markdownStyles(colors, isUser ? 'user' : 'assistant')}>{body}</Markdown>
+        {body.trim() ? (
+          <Markdown style={markdownStyles(colors, isUser ? 'user' : 'assistant')}>{body}</Markdown>
+        ) : null}
+        {files.length > 0 ? (
+          <View style={styles.attachments}>
+            {files.map((path) => (
+              <View key={path} style={styles.attachment}>
+                <Ionicons name="image-outline" size={12} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.attachmentText} numberOfLines={1}>
+                  {baseName(path)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {message.pending ? (
           <Text style={[styles.pendingLabel, { color: 'rgba(255,255,255,0.8)' }]}>
             {t('message.sending')}
@@ -212,6 +233,25 @@ const styles = StyleSheet.create({
   },
   pending: { opacity: 0.72 },
   pendingLabel: { fontSize: FontSize.xs, textAlign: 'right', marginBottom: Spacing.xs },
+  // Attachment chips only ever render inside the (primary-tinted) user bubble.
+  attachments: { gap: Spacing.xs, marginBottom: Spacing.sm, marginTop: 2 },
+  attachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  attachmentText: {
+    fontSize: FontSize.xs,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.95)',
+    flexShrink: 1,
+  },
   centerWrap: { alignItems: 'center', marginBottom: Spacing.sm, paddingHorizontal: Spacing.xl },
   centerText: { fontSize: FontSize.xs, textAlign: 'center', lineHeight: 18 },
   thinking: {
