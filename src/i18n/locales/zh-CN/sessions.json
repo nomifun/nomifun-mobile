@@ -128,5 +128,18 @@
     "companion": "伙伴会话",
     "summoned": "已召唤伙伴",
     "projectSession": "项目会话"
+  },
+  "model": {
+    "title": "选择模型",
+    "subtitle": "换模型会重启这个会话的智能体，从下一条消息生效。",
+    "choose": "选择模型",
+    "unset": "未选模型",
+    "changeFrom": "当前模型 {{model}}，点击更换",
+    "switched": "已切换到 {{model}}",
+    "switchFailed": "切换失败：{{message}}",
+    "managed": "托管",
+    "loadFailed": "读取模型列表失败",
+    "emptyTitle": "没有可用的对话模型",
+    "emptyHint": "请先在「我的 → 模型管理」里添加供应商，或在桌面端配置。"
   }
 }

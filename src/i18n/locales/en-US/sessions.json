@@ -128,5 +128,18 @@
     "companion": "Companion session",
     "summoned": "Companion summoned",
     "projectSession": "Project session"
+  },
+  "model": {
+    "title": "Choose a model",
+    "subtitle": "Switching restarts this conversation’s agent; it applies from the next message.",
+    "choose": "Choose a model",
+    "unset": "No model",
+    "changeFrom": "Current model {{model}} — tap to change",
+    "switched": "Switched to {{model}}",
+    "switchFailed": "Switch failed: {{message}}",
+    "managed": "Managed",
+    "loadFailed": "Could not read the model catalog",
+    "emptyTitle": "No chat model available",
+    "emptyHint": "Add a provider under Me → Models, or configure one on the desktop."
   }
 }

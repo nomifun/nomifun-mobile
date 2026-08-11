@@ -208,6 +208,8 @@ export default function SessionDetailScreen() {
       // streaming while the card waits — keep the explanation on screen.
       hintWhileStreaming={confirmations.items.length > 0}
       attachments={attachments}
+      conversation={conversation.data}
+      onModelChanged={() => void conversation.mutate()}
       onSend={handleSend}
       onStop={handleStop}
     />
@@ -282,13 +284,12 @@ export default function SessionDetailScreen() {
         scrollEventThrottle={64}
         keyboardShouldPersistTaps="handled"
         initialNumToRender={20}
-        refreshControl={
-          <RefreshControl
-            refreshing={chat.isRefreshing}
-            onRefresh={() => void chat.refresh()}
-            tintColor={colors.textTertiary}
-          />
-        }
+        /**
+         * No pull-to-refresh here: the transcript is already live over the
+         * WebSocket, older turns load through the explicit control at the top,
+         * and on web the fallback control floats a "refresh" pill over the
+         * first message.
+         */
       />
     </Screen>
   );
