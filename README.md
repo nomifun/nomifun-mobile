@@ -1,21 +1,24 @@
 # nomifun-mobile
 
-Nomifun 的手机端（Android / iOS / H5），基于 **Expo (React Native)**。
+NomiFun 的手机端（Android / iOS / H5），基于 **Expo (React Native)**。
 
-手机是"遥控器"：所有引擎执行、24h 持续工作都由 **Nomifun 桌面端** 承担，
+手机是“随身入口”：所有引擎执行、24h 持续工作都由 **NomiFun Desktop** 承担，
 手机通过局域网直连桌面端的 WebUI HTTP/WS API，与桌面状态完全互通，并增强
 移动场景能力（扫码连接、完成通知）。
 
 ## NomiFun 开源产品家族
 
-NomiFun 由三个互相关联、也可以独立使用的开源项目组成。**Desktop 是本地 AI
-与数据中枢，Mobile 是随身客户端，小智云台是机器人载体。**
+NomiFun 由三个互相关联的开源项目组成。**Desktop 是本地 AI 与数据中枢，Mobile
+是随身客户端，小智云台是机器人载体。** 你可以按场景选择 Mobile 或小智云台，
+但它们都通过 Desktop 获得统一的模型、Agent、伙伴、任务和本地数据能力。
 
-| 项目 | 定位 | 与本项目的关系 |
+| 项目 | 定位 | 了解与参与 |
 |---|---|---|
-| [NomiFun Desktop](https://github.com/nomifun/nomifun-desktop) | Windows / macOS / Linux 本地 AI 工作站，负责模型、Agent、Skills、知识、任务、数据和开放接口 | **Mobile 必须连接它或同协议的 nomifun-web 服务**；推荐先安装并启动 Desktop |
-| **[NomiFun Mobile](https://github.com/nomifun/nomifun-mobile)**（本仓库） | Android / iOS / H5 随身客户端 | 通过 HTTP / WebSocket 使用 Desktop 的会话、任务、需求、伙伴与模型能力 |
-| [NomiFun 小智云台](https://github.com/nomifun/nomifun-xiaozhi-yuntai) | ESP32-S3 小智机器人与云台工程 | 与 Mobile 一样消费 Desktop 开放的本地 AI 能力，但面向语音、动作和实体交互 |
+| [NomiFun Desktop](https://github.com/nomifun/nomifun-desktop) | Windows / macOS / Linux 本地 AI 工作站，负责模型、Agent、Skills、知识、任务、数据和开放接口；是 Mobile 与小智云台的能力中枢 | [产品介绍](https://www.nomifun.com/zh/products/desktop/) · [源码](https://github.com/nomifun/nomifun-desktop) · [WebUI / Mobile 接入](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md) |
+| **[NomiFun Mobile](https://github.com/nomifun/nomifun-mobile)**（本仓库） | Android / iOS / H5 随身客户端，通过 HTTP / WebSocket 使用 Desktop 的会话、任务、需求、伙伴与模型能力 | [产品介绍](https://www.nomifun.com/zh/products/mobile/) · [源码](https://github.com/nomifun/nomifun-mobile) · [连接与认证协议](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/connectivity.md) |
+| [NomiFun 小智云台](https://github.com/nomifun/nomifun-xiaozhi-yuntai) | ESP32-S3 小智机器人与云台工程，连接 Desktop 的伙伴能力，面向语音、动作和实体交互 | [产品介绍与演示](https://www.nomifun.com/zh/products/xiaozhi-yuntai/) · [源码](https://github.com/nomifun/nomifun-xiaozhi-yuntai) · [接入 Desktop](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/xiaozhi-robot.zh.md) |
+
+产品总览与三个项目的入口也可以从 [NomiFun 官网](https://www.nomifun.com/zh/products/) 获取。
 
 ### 推荐接入顺序
 
@@ -45,19 +48,47 @@ NomiFun 由三个互相关联、也可以独立使用的开源项目组成。**D
 
 ## 架构
 
+### Desktop 中枢 + Mobile 轻客户端
+
+NomiFun 没有把 Desktop 简单包装成一个依赖厂商云端的手机网页，而是把职责拆分为：
+
+- **Desktop 是唯一的本地中枢**：持有本地数据、模型配置、Agent / 伙伴、Skills、
+  知识库、会话和自动化任务，并持续执行需要长时间运行的工作。
+- **Mobile 是轻量交互端**：不复制执行引擎和完整业务数据，通过 Desktop 已开放的
+  同一套 WebUI API 查看实时状态、发送指令并接收完成通知。
+- **控制与实时事件分离**：业务查询和命令走 HTTP `/api/*`；流式回复、任务状态等
+  增量事件复用一个 WebSocket `/ws`，减少轮询和重复实现。
+- **直连而非 NomiFun 云端中转**：在同一可信局域网内，Mobile 直接访问 Desktop
+  按需开启的 LAN 监听器，数据不会为了远控而先经过 NomiFun 运营的云端服务器。
+
+这种架构让同一个 Desktop 中枢可以同时服务桌面 UI、Mobile 和机器人载体：核心能力
+与数据规则只有一份，客户端只负责适合各自设备的交互，因此跨端状态一致，也不会在
+每个终端重复维护一套 Agent 引擎。
+
 ```
 ┌──────────────┐   HTTP /api/* (Bearer JWT + CSRF 双提交)   ┌──────────────────┐
-│ nomifun-mobile│ ◄────────────────────────────────────────► │ Nomifun 桌面端    │
+│ nomifun-mobile│ ◄────────────────────────────────────────► │ NomiFun Desktop  │
 │ (Expo RN App) │   WS /ws ({name,data} 信封, JWT subprotocol)│ (内嵌 WebUI 服务器)│
 └──────────────┘                                            └──────────────────┘
 ```
 
-- 连接方式一（推荐）：桌面端「开放能力 → WebUI 远程访问」开启后，App 扫描面板
-  二维码（`http://<ip>:25808/qr-login?token=…`），一次性 token 换 30 天 JWT。
+- Desktop 默认只有本机回环监听器；只有用户主动开启“WebUI 远程访问”时，才按需创建
+  LAN 监听器，因此不开启就不会向局域网暴露入口。
+- 连接方式一（推荐）：App 扫描 Desktop 面板生成的二维码
+  （`http://<ip>:25808/qr-login?token=…`）。二维码 token 仅短时有效且只能消费一次，
+  成功认证后再换取有期限的 JWT；二维码只能由 Desktop 本机生成。
 - 连接方式二：手输 `IP:端口` + 用户名密码（密码显示在桌面端面板上）。
+- 远程 HTTP 请求使用 Bearer JWT 与 CSRF 双提交保护，WebSocket 也需要认证；认证凭据
+  应像登录密码一样妥善保存，设备丢失或网络环境变化时应在 Desktop 侧撤销或重置。
 - H5 形态必须与服务端**同源**部署/代理（浏览器跨域 Cookie 限制），开发期由
   `scripts/dev-proxy.mjs` 合并到同一端口；原生 App 无此限制，直接绝对地址访问。
-- 服务端契约调研笔记见 `docs/research/`（端点、WS 主题、认证细节均有出处）。
+- 当前 LAN 入口是 HTTP 明文通信，适用于**可信局域网**；需要跨网访问时，应由用户
+  自行部署 VPN、Tailscale 或带 TLS 的安全反向代理，不能直接把端口暴露到公网。
+- “无 NomiFun 云端中转”不等于“所有能力完全离线”：Desktop 是否访问第三方云模型
+  取决于用户选择的模型供应商，Mobile 也必须能够连接到正在运行的 Desktop。
+- 进一步阅读：[Mobile 连接、认证与安全边界](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/connectivity.md)、
+  [HTTP + WebSocket 实时协议](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/ws-protocol.md)、
+  [Desktop WebUI 远程访问](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md)。
 
 ## 开发（Ubuntu，H5 优先）
 
@@ -117,3 +148,13 @@ docs/FOUNDATION.md 基础设施契约
 - 仅局域网直连；`nomifun-net-infra` 公网中继暂未接入（手输地址已兼容自建
   `nomifun-web` 域名部署，协议一致）。
 - 渠道机器人创建、知识库管理、MCP/技能、终端等重交互留在桌面端。
+
+## 联系与交流
+
+- 官网与产品文档：[https://www.nomifun.com](https://www.nomifun.com)
+- 问题反馈：[nomifun-mobile Issues](https://github.com/nomifun/nomifun-mobile/issues)
+- 联系邮箱：[535526063@qq.com](mailto:535526063@qq.com)
+- 微信交流群：请使用微信扫描下方二维码。二维码可能会按群有效期更新，请以仓库最新
+  图片为准。
+
+![NomiFun 微信交流群二维码](docs/assets/nomifun-wechat-group.jpg)
