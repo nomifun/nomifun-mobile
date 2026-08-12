@@ -7,11 +7,10 @@
  * way — ACP sessions use `PUT .../model` and a mode concept the phone does not
  * implement, so the picker hides itself for them.
  *
- * Candidates come from the same resolver the desktop selector uses
- * (`POST /api/model-profiles/resolve {task:'chat'}`), joined against the
- * provider list for display names. A model the resolver no longer returns is
- * still shown when it is the current one, so a stale binding stays visible
- * instead of silently reading as "no model".
+ * Candidates come from the same canonical nested provider catalog used by the
+ * model-management screen, filtered to enabled chat capabilities. A model the
+ * catalog no longer returns is still shown when it is the current one, so a
+ * stale binding stays visible instead of silently reading as "no model".
  */
 import { isManagedProvider } from '@/features/models/platforms';
 
@@ -55,8 +54,8 @@ export function isSameModel(a: WireModel | undefined, b: { providerId: string; m
 }
 
 /**
- * Group the resolver's flat candidate list by provider, in provider order, and
- * make sure the conversation's current model is present even when the resolver
+ * Group the catalog's flat candidate list by provider, in provider order, and
+ * make sure the conversation's current model is present even when the catalog
  * dropped it (disabled row, deleted model, provider re-keyed).
  */
 export function buildModelGroups(

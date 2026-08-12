@@ -1,22 +1,51 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/api/types';
-import { Button, EmptyState, ErrorState, Loading, Screen, SectionTitle, toast } from '@/components/ui';
+import {
+  ASR_KEY,
+  DEFAULT_CHAT_MODEL_KEY,
+  DEFAULT_IMAGE_MODEL_KEY,
+  TTS_KEY,
+  setClientSetting,
+  updateProvider,
+} from '@/features/models/api';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Loading,
+  Screen,
+  SectionTitle,
+  toast,
+} from '@/components/ui';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DEFAULT_CHAT_MODEL_KEY, setClientSetting, updateProvider } from '@/features/models/api';
 import { AddProviderSheet } from '@/features/models/components/add-provider-sheet';
 import { DefaultsCard } from '@/features/models/components/defaults-card';
+import {
+  ImageDefaultModelSheet,
+  SpeechToTextDefaultModelSheet,
+  TextToSpeechDefaultModelSheet,
+} from '@/features/models/components/default-model-sheets';
 import { ModelPickerSheet } from '@/features/models/components/model-picker-sheet';
 import { ProviderCard } from '@/features/models/components/provider-card';
 import { errorMessage, isReferenceConflict } from '@/features/models/errors';
 import { useClientDefaults, useProviders } from '@/features/models/hooks';
-import type { ModelRef, ProviderResponse } from '@/features/models/types';
+import { SerializedLatestWriteQueue } from '@/features/models/serialized-latest-write-queue';
+import type {
+  ModelRef,
+  ProviderResponse,
+  SpeechToTextConfig,
+  TextToSpeechConfig,
+} from '@/features/models/types';
 
-/** 模型管理 — provider list + the install-wide defaults. */
+type DefaultSheet = 'chat' | 'image' | 'asr' | 'tts' | null;
+type DefaultValue = ModelRef | SpeechToTextConfig | TextToSpeechConfig | null;
+
+/** Provider list plus the task-specific install-wide defaults. */
 export default function ModelsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
@@ -28,8 +57,10 @@ export default function ModelsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [defaultSheet, setDefaultSheet] = useState<DefaultSheet>(null);
   const [savingDefault, setSavingDefault] = useState(false);
+  const [defaultError, setDefaultError] = useState('');
+  const defaultWriteQueue = useRef(new SerializedLatestWriteQueue());
 
   const refreshAll = async () => {
     setRefreshing(true);
@@ -42,7 +73,6 @@ export default function ModelsScreen() {
 
   const toggleProvider = async (provider: ProviderResponse, next: boolean) => {
     setBusyId(provider.provider_id);
-    // Optimistic: flip locally, then let the server be the authority.
     await mutate(
       (list) =>
         list?.map((item) =>
@@ -60,23 +90,57 @@ export default function ModelsScreen() {
     }
   };
 
-  const applyChatDefault = async (ref: ModelRef | null) => {
+  const openDefault = (kind: Exclude<DefaultSheet, null>) => {
+    setDefaultError('');
+    setDefaultSheet(kind);
+  };
+
+  const applyDefault = async (key: string, value: DefaultValue) => {
     setSavingDefault(true);
-    try {
-      // `null` deletes the key — "no default" must never be a half-empty object.
-      await setClientSetting(DEFAULT_CHAT_MODEL_KEY, ref);
-      await mutateDefaults();
-      toast.success(ref ? tc('feedback.saved') : t('defaults.cleared'));
-      setPickerOpen(false);
-    } catch (err) {
-      toast.error(
-        isReferenceConflict(err)
-          ? t('defaults.conflict')
-          : errorMessage(err, tc('feedback.requestFailed')),
-      );
-      void mutateDefaults();
-    } finally {
-      setSavingDefault(false);
+    setDefaultError('');
+    const queue = defaultWriteQueue.current;
+    const { done } = queue.enqueue(
+      () =>
+        // `null` deletes the key. Never persist a half-empty model reference.
+        setClientSetting(key, value),
+      {
+        onLatestSuccess: () => {
+          setDefaultSheet(null);
+          toast.success(value ? tc('feedback.saved') : t('defaults.cleared'));
+          void mutateDefaults();
+        },
+        onLatestError: (err) => {
+          const message = isReferenceConflict(err)
+            ? t('defaults.conflict')
+            : errorMessage(err, tc('feedback.requestFailed'));
+          setDefaultError(message);
+          void mutateDefaults();
+        },
+        onLatestSettled: () => {
+          setSavingDefault(false);
+        },
+      },
+    );
+
+    // Apply the latest choice immediately in the local SWR snapshot. The
+    // serialized queue makes the eventual server order deterministic, while
+    // the optimistic snapshot keeps rapid taps responsive on mobile.
+    void mutateDefaults(
+      (current) => {
+        const next = { ...(current ?? {}) };
+        if (value === null) delete next[key];
+        else next[key] = value;
+        return next;
+      },
+      { revalidate: false },
+    );
+    await done;
+  };
+
+  const closeDefault = () => {
+    if (!savingDefault) {
+      setDefaultError('');
+      setDefaultSheet(null);
     }
   };
 
@@ -115,8 +179,15 @@ export default function ModelsScreen() {
       <DefaultsCard
         defaults={defaults}
         providers={list}
-        onEditChat={() => setPickerOpen(true)}
+        onEditChat={() => openDefault('chat')}
+        onEditImage={() => openDefault('image')}
+        onEditAsr={() => openDefault('asr')}
+        onEditTts={() => openDefault('tts')}
       />
+
+      {defaultError && defaultSheet === null ? (
+        <Text style={[styles.error, { color: colors.danger }]}>{defaultError}</Text>
+      ) : null}
 
       <SectionTitle>{t('list.providers')}</SectionTitle>
       {list.length === 0 ? (
@@ -159,15 +230,49 @@ export default function ModelsScreen() {
       />
 
       <ModelPickerSheet
-        visible={pickerOpen}
+        visible={defaultSheet === 'chat'}
         task="chat"
         title={t('defaults.chat')}
         current={defaults?.chat}
         providers={list}
         busy={savingDefault}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(ref) => void applyChatDefault(ref)}
-        onClear={() => void applyChatDefault(null)}
+        onClose={closeDefault}
+        onSelect={(ref) => void applyDefault(DEFAULT_CHAT_MODEL_KEY, ref)}
+        onClear={() => void applyDefault(DEFAULT_CHAT_MODEL_KEY, null)}
+      >
+        {defaultError ? (
+          <Text style={[styles.inlineError, { color: colors.danger }]}>{defaultError}</Text>
+        ) : null}
+      </ModelPickerSheet>
+
+      <ImageDefaultModelSheet
+        visible={defaultSheet === 'image'}
+        current={defaults?.imageGeneration}
+        providers={list}
+        busy={savingDefault}
+        error={defaultError}
+        onClose={closeDefault}
+        onSave={(value) => applyDefault(DEFAULT_IMAGE_MODEL_KEY, value)}
+      />
+
+      <SpeechToTextDefaultModelSheet
+        visible={defaultSheet === 'asr'}
+        config={defaults?.asr}
+        providers={list}
+        busy={savingDefault}
+        error={defaultError}
+        onClose={closeDefault}
+        onSave={(value) => applyDefault(ASR_KEY, value)}
+      />
+
+      <TextToSpeechDefaultModelSheet
+        visible={defaultSheet === 'tts'}
+        config={defaults?.tts}
+        providers={list}
+        busy={savingDefault}
+        error={defaultError}
+        onClose={closeDefault}
+        onSave={(value) => applyDefault(TTS_KEY, value)}
       />
     </Screen>
   );
@@ -176,4 +281,6 @@ export default function ModelsScreen() {
 const styles = StyleSheet.create({
   hint: { fontSize: FontSize.xs, lineHeight: 17, marginTop: Spacing.xs },
   action: { marginTop: Spacing.xl },
+  error: { fontSize: FontSize.sm, lineHeight: 19, marginTop: Spacing.sm },
+  inlineError: { fontSize: FontSize.sm, lineHeight: 19 },
 });

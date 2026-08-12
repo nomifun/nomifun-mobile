@@ -1,51 +1,56 @@
 /**
- * Typed endpoint functions for 模型管理.
+ * HTTP surface for the canonical provider/model graph.
  *
- * Contract notes that bit the desktop already (docs/research/feature-models.md
- * §9) and must not be regressed here:
- * - Request DTOs are `deny_unknown_fields`: build bodies from explicit fields,
- *   never spread a UI record.
- * - Per-model edits go through `POST /api/provider-models/update` (partial by
- *   natural key), never a whole-map `PUT /api/providers/{id}` — that is a
- *   read-modify-write race.
- * - `model_health` sent on provider create/update is ignored; the server probe
- *   is the only health writer, so after a heartbeat we refetch instead of
- *   merging locally.
- * - Clearing a client-preference model reference means writing `null` (deleting
- *   the key), never a half-empty object (the server 409s on dead references and
- *   does not partially persist a batch).
+ * Bodies are assembled explicitly because the desktop backend uses strict
+ * deny-unknown-fields DTOs.  In particular, credentials are typed write-only
+ * JSON and are never read back or copied from a response object.
  */
 import { api } from '@/api/client';
 
-import { buildTasksUpdateBody } from './tasks';
 import type {
   ClientDefaults,
   CreateProviderBody,
-  DetectProtocolBody,
+  FetchModelsAnonymousBody,
+  FetchModelsProviderBody,
   FetchModelsResponse,
+  ModelProtocolManifestResponse,
   ModelRef,
   ModelTask,
   ModelTrait,
-  ProtocolDetectionResponse,
+  ProviderConnectionResponse,
   ProviderHealthCheckResponse,
+  ProviderModelKey,
   ProviderModelResponse,
   ProviderResponse,
-  ResolveModelsResponse,
+  SaveProviderConnectionBody,
+  SaveProviderModelBody,
   SpeechToTextConfig,
   TextToSpeechConfig,
   UpdateProviderBody,
 } from './types';
+import { capabilityInputFromResponse as capabilityInputFromAdvancedResponse } from './advanced';
 
 export const PROVIDERS_KEY = '/api/providers';
 export const CLIENT_SETTINGS_KEY = '/api/settings/client';
+export const PROVIDER_MODELS_KEY = '/api/provider-models';
 
 export const providerModelsKey = (providerId: string): string =>
-  `/api/provider-models?provider_id=${encodeURIComponent(providerId)}`;
+  `${PROVIDER_MODELS_KEY}?provider_id=${encodeURIComponent(providerId)}`;
 
-export const resolveKey = (task: ModelTask): readonly [string, ModelTask] =>
-  ['/api/model-profiles/resolve', task] as const;
+export const providerConnectionsKey = (providerId: string): string =>
+  `${PROVIDERS_KEY}/${encodeURIComponent(providerId)}/connections`;
 
-/* ------------------------------------------------------------------ providers */
+export const modelProtocolsKey = (
+  preset: string,
+  task: ModelTask,
+  baseUrl?: string,
+): string => {
+  const query = new URLSearchParams({ preset, task });
+  if (baseUrl?.trim()) query.set('base_url', baseUrl.trim());
+  return `/api/model-protocols?${query.toString()}`;
+};
+
+/* ---------------------------------------------------------------- providers */
 
 export function listProviders(): Promise<ProviderResponse[]> {
   return api<ProviderResponse[]>(PROVIDERS_KEY);
@@ -56,10 +61,14 @@ export function createProvider(body: CreateProviderBody): Promise<ProviderRespon
     platform: body.platform,
     name: body.name,
     base_url: body.base_url,
-    api_key: body.api_key,
+    auth_scheme: body.auth_scheme,
+    credentials: body.credentials,
+    initial_model: body.initial_model,
   };
-  if (body.models && body.models.length > 0) payload.models = body.models;
   if (body.enabled !== undefined) payload.enabled = body.enabled;
+  if (body.bedrock_config !== undefined) payload.bedrock_config = body.bedrock_config;
+  if (body.sort_order !== undefined) payload.sort_order = body.sort_order;
+  if (body.connections !== undefined) payload.connections = body.connections;
   return api<ProviderResponse>(PROVIDERS_KEY, { body: payload });
 }
 
@@ -70,8 +79,11 @@ export function updateProvider(
   const payload: Record<string, unknown> = {};
   if (patch.name !== undefined) payload.name = patch.name;
   if (patch.base_url !== undefined) payload.base_url = patch.base_url;
-  if (patch.api_key !== undefined) payload.api_key = patch.api_key;
+  if (patch.auth_scheme !== undefined) payload.auth_scheme = patch.auth_scheme;
+  if (patch.credentials !== undefined) payload.credentials = patch.credentials;
   if (patch.enabled !== undefined) payload.enabled = patch.enabled;
+  if (patch.bedrock_config !== undefined) payload.bedrock_config = patch.bedrock_config;
+  if (patch.sort_order !== undefined) payload.sort_order = patch.sort_order;
   return api<ProviderResponse>(`${PROVIDERS_KEY}/${encodeURIComponent(providerId)}`, {
     method: 'PUT',
     body: payload,
@@ -82,130 +94,158 @@ export function deleteProvider(providerId: string): Promise<void> {
   return api<void>(`${PROVIDERS_KEY}/${encodeURIComponent(providerId)}`, { method: 'DELETE' });
 }
 
-/** Upstream catalog for a SAVED provider. */
+export function cloneProvider(providerId: string, name?: string): Promise<ProviderResponse> {
+  const body = name?.trim() ? { name: name.trim() } : undefined;
+  return api<ProviderResponse>(`${PROVIDERS_KEY}/${encodeURIComponent(providerId)}/clone`, {
+    method: 'POST',
+    body,
+  });
+}
+
+/* ---------------------------------------------------------- model discovery */
+
 export function fetchProviderModels(
   providerId: string,
   tryFix = false,
 ): Promise<FetchModelsResponse> {
   return api<FetchModelsResponse>(`${PROVIDERS_KEY}/${encodeURIComponent(providerId)}/models`, {
-    body: { try_fix: tryFix },
+    body: { try_fix: tryFix } satisfies FetchModelsProviderBody,
     timeoutMs: 20_000,
   });
 }
 
-/** Upstream catalog before the provider row exists (add-provider form). */
-export function fetchModelsAnonymous(input: {
-  platform: string;
-  base_url: string;
-  api_key: string;
-  try_fix?: boolean;
-}): Promise<FetchModelsResponse> {
+export function fetchModelsAnonymous(input: FetchModelsAnonymousBody): Promise<FetchModelsResponse> {
+  const body: Record<string, unknown> = {
+    platform: input.platform,
+    base_url: input.base_url,
+    auth_scheme: input.auth_scheme,
+    credentials: input.credentials,
+    try_fix: input.try_fix ?? false,
+  };
+  if (input.bedrock_config !== undefined) body.bedrock_config = input.bedrock_config;
   return api<FetchModelsResponse>(`${PROVIDERS_KEY}/fetch-models`, {
-    body: {
-      platform: input.platform,
-      base_url: input.base_url,
-      api_key: input.api_key,
-      try_fix: input.try_fix ?? false,
-    },
+    body,
     timeoutMs: 20_000,
   });
 }
 
-/** Connectivity test #1: does this (base_url, api_key) pair authenticate? */
-export function detectProtocol(body: DetectProtocolBody): Promise<ProtocolDetectionResponse> {
-  return api<ProtocolDetectionResponse>(`${PROVIDERS_KEY}/detect-protocol`, {
+/* -------------------------------------------------------- provider models */
+
+export function listProviderModels(providerId?: string): Promise<ProviderModelResponse[]> {
+  return api<ProviderModelResponse[]>(
+    providerId ? providerModelsKey(providerId) : PROVIDER_MODELS_KEY,
+  );
+}
+
+/** Full atomic replacement of one model and all of its capabilities. */
+export function saveProviderModel(body: SaveProviderModelBody): Promise<ProviderModelResponse> {
+  return api<ProviderModelResponse>(PROVIDER_MODELS_KEY, {
+    method: 'PUT',
     body: {
-      base_url: body.base_url,
-      api_key: body.api_key,
-      timeout: body.timeout ?? 10_000,
-      test_all_keys: body.test_all_keys ?? false,
+      provider_id: body.provider_id,
+      model: body.model,
     },
-    timeoutMs: 25_000,
   });
 }
 
-/* ------------------------------------------------------- provider model rows */
-
-export function listProviderModels(providerId: string): Promise<ProviderModelResponse[]> {
-  return api<ProviderModelResponse[]>(providerModelsKey(providerId));
-}
-
-/** Empty `tasks` → the server seeds the heuristic profile (`source: 'inferred'`). */
 export function createProviderModel(
   providerId: string,
-  model: string,
+  model: {
+    model: string;
+    enabled?: boolean;
+    description?: string;
+    sort_order?: number;
+    capabilities: SaveProviderModelBody['model']['capabilities'];
+  },
 ): Promise<ProviderModelResponse> {
-  return api<ProviderModelResponse>('/api/provider-models', {
-    body: { provider_id: providerId, model },
-  });
+  return saveProviderModel({ provider_id: providerId, model });
 }
 
 export function setProviderModelEnabled(
   providerId: string,
-  model: string,
+  row: ProviderModelResponse,
   enabled: boolean,
 ): Promise<ProviderModelResponse> {
-  return api<ProviderModelResponse>('/api/provider-models/update', {
-    body: { provider_id: providerId, model, enabled },
-  });
-}
-
-/**
- * Replace a row's task tags (模态能力).
- *
- * The same endpoint carries them, and sending `tasks` makes the server stamp
- * `source: 'user'` — the row stops being re-derived from the model name. Since
- * migration 015 the resolver reads these very rows, so this is what decides
- * which pickers the model shows up in.
- *
- * `traits`, `context_limit`, `protocol`, `connection_role` and `params` are
- * deliberately absent (= keep): those stay desktop-only edits.
- */
-export function setProviderModelTasks(
-  providerId: string,
-  model: string,
-  tasks: readonly ModelTask[],
-): Promise<ProviderModelResponse> {
-  return api<ProviderModelResponse>('/api/provider-models/update', {
-    body: buildTasksUpdateBody(providerId, model, tasks),
+  return saveProviderModel({
+    provider_id: providerId,
+    model: {
+      model: row.model,
+      enabled,
+      ...(row.description === undefined ? {} : { description: row.description }),
+      sort_order: row.sort_order,
+      capabilities: row.capabilities.map(capabilityInputFromAdvancedResponse),
+    },
   });
 }
 
 export function deleteProviderModel(providerId: string, model: string): Promise<void> {
-  return api<void>('/api/provider-models/delete', {
-    body: { provider_id: providerId, model },
+  const key: ProviderModelKey = { provider_id: providerId, model };
+  return api<void>(
+    `${PROVIDER_MODELS_KEY}?provider_id=${encodeURIComponent(key.provider_id)}&model=${encodeURIComponent(
+      key.model,
+    )}`,
+    { method: 'DELETE' },
+  );
+}
+
+/* ---------------------------------------------------------- connections */
+
+export function listProviderConnections(providerId: string): Promise<ProviderConnectionResponse[]> {
+  return api<ProviderConnectionResponse[]>(providerConnectionsKey(providerId));
+}
+
+export function saveProviderConnection(
+  providerId: string,
+  body: SaveProviderConnectionBody,
+): Promise<ProviderConnectionResponse> {
+  const payload: Record<string, unknown> = {
+    role: body.role,
+    base_url: body.base_url,
+    auth_scheme: body.auth_scheme,
+  };
+  if (body.label !== undefined) payload.label = body.label;
+  if (body.credentials !== undefined) payload.credentials = body.credentials;
+  if (body.extra !== undefined) payload.extra = body.extra;
+  return api<ProviderConnectionResponse>(providerConnectionsKey(providerId), {
+    method: 'PUT',
+    body: payload,
   });
 }
 
-/* ------------------------------------------------------------ health + resolve */
+export function deleteProviderConnection(providerId: string, role: string): Promise<void> {
+  return api<void>(
+    `${providerConnectionsKey(providerId)}/${encodeURIComponent(role)}`,
+    { method: 'DELETE' },
+  );
+}
 
-/** Connectivity test #3: a real inference call; persists `health` on the row. */
+/* ------------------------------------------------------ protocol manifests */
+
+export function fetchModelProtocolManifest(
+  preset: string,
+  task: ModelTask,
+  baseUrl?: string,
+): Promise<ModelProtocolManifestResponse> {
+  return api<ModelProtocolManifestResponse>(modelProtocolsKey(preset, task, baseUrl));
+}
+
+/* -------------------------------------------------------------- health */
+
 export function providerHealthCheck(
   providerId: string,
   model: string,
-  task?: ModelTask,
+  task: ModelTask,
 ): Promise<ProviderHealthCheckResponse> {
-  const payload: Record<string, unknown> = { provider_id: providerId, model };
-  if (task) payload.task = task;
   return api<ProviderHealthCheckResponse>('/api/agents/provider-health-check', {
-    body: payload,
+    body: { provider_id: providerId, model, task },
     timeoutMs: 60_000,
   });
 }
 
-/** The authority for every model selector. Returns ENABLED rows only. */
-export function resolveModelsForTask(
-  task: ModelTask,
-  requiredTraits?: ModelTrait[],
-): Promise<ResolveModelsResponse> {
-  const payload: Record<string, unknown> = { task };
-  if (requiredTraits && requiredTraits.length > 0) payload.required_traits = requiredTraits;
-  return api<ResolveModelsResponse>('/api/model-profiles/resolve', { body: payload });
-}
-
-/* ------------------------------------------------------------ global defaults */
+/* ----------------------------------------------------- client preferences */
 
 export const DEFAULT_CHAT_MODEL_KEY = 'nomi.defaultModel';
+export const DEFAULT_IMAGE_MODEL_KEY = 'models.default.imageGeneration';
 export const TTS_KEY = 'tools.textToSpeech';
 export const ASR_KEY = 'tools.speechToText';
 
@@ -218,19 +258,78 @@ function asModelRef(value: unknown): ModelRef | undefined {
   return { provider_id: providerId, model };
 }
 
-/** Pick this feature's keys out of the whole client-preference map. */
+function asTextToSpeechConfig(value: unknown): TextToSpeechConfig | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  const ref = asModelRef(raw);
+  if (!ref) return undefined;
+  const voice =
+    raw.voice === undefined || raw.voice === null
+      ? null
+      : typeof raw.voice === 'string'
+        ? raw.voice
+        : undefined;
+  if (voice === undefined) return undefined;
+  return { ...ref, voice };
+}
+
+function asSpeechToTextConfig(value: unknown): SpeechToTextConfig | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.enabled !== 'boolean') return undefined;
+  const providerId =
+    raw.provider_id === undefined || raw.provider_id === null
+      ? undefined
+      : typeof raw.provider_id === 'string' && raw.provider_id.trim()
+        ? raw.provider_id
+        : undefined;
+  const model =
+    raw.model === undefined || raw.model === null
+      ? undefined
+      : typeof raw.model === 'string' && raw.model.trim()
+        ? raw.model
+        : undefined;
+  // The backend validates this as an optional pair. Do not expose a half
+  // reference as a selectable current value.
+  if ((providerId && !model) || (!providerId && model)) return undefined;
+  const language =
+    raw.language === undefined || raw.language === null
+      ? undefined
+      : typeof raw.language === 'string'
+        ? raw.language
+        : undefined;
+  if (raw.language !== undefined && raw.language !== null && language === undefined) {
+    return undefined;
+  }
+  const autoSend =
+    raw.auto_send === undefined || raw.auto_send === null
+      ? undefined
+      : typeof raw.auto_send === 'boolean'
+        ? raw.auto_send
+        : undefined;
+  if (raw.auto_send !== undefined && raw.auto_send !== null && autoSend === undefined) {
+    return undefined;
+  }
+  return {
+    enabled: raw.enabled,
+    ...(providerId && model ? { provider_id: providerId, model } : {}),
+    ...(language === undefined ? {} : { language }),
+    ...(autoSend === undefined ? {} : { auto_send: autoSend }),
+  };
+}
+
 export function pickClientDefaults(map: Record<string, unknown> | undefined): ClientDefaults {
   if (!map) return {};
   const tts = map[TTS_KEY];
   const asr = map[ASR_KEY];
   return {
     chat: asModelRef(map[DEFAULT_CHAT_MODEL_KEY]),
-    tts: tts && typeof tts === 'object' ? (tts as TextToSpeechConfig) : undefined,
-    asr: asr && typeof asr === 'object' ? (asr as SpeechToTextConfig) : undefined,
+    imageGeneration: asModelRef(map[DEFAULT_IMAGE_MODEL_KEY]),
+    tts: asTextToSpeechConfig(tts),
+    asr: asSpeechToTextConfig(asr),
   };
 }
 
-/** Write one client preference; `null` DELETES the key (= "no default"). */
 export function setClientSetting(key: string, value: unknown): Promise<void> {
   return api<void>(CLIENT_SETTINGS_KEY, { method: 'PUT', body: { [key]: value } });
 }

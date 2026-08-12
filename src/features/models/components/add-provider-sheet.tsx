@@ -1,207 +1,558 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
 
 import { Button, TextField, toast } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { createProvider, detectProtocol, fetchModelsAnonymous } from '@/features/models/api';
+import {
+  createProvider,
+  fetchModelsAnonymous,
+} from '@/features/models/api';
 import { Sheet } from '@/features/models/components/sheet';
 import { errorMessage } from '@/features/models/errors';
 import {
   PLATFORM_PRESETS,
-  apiKeyCount,
   isHttpUrl,
   platformHasNoModelsEndpoint,
-  platformSkipsPreSaveKeyProbe,
 } from '@/features/models/platforms';
-import type { ModelInfo, ProtocolDetectionResponse } from '@/features/models/types';
+import {
+  AUTH_SCHEME_PRESETS,
+  buildBedrockConfig,
+  buildConnectionCredentials,
+  buildProviderCredentials,
+  credentialsKindForScheme,
+  isValidConnectionRole,
+  type BedrockAuthMethod,
+  type ConnectionCredentialsDraft,
+} from '@/features/models/connection-form';
+import {
+  capabilityInputsFromDefinition,
+  normalizeModelId,
+  validateModelDefinition,
+  type CatalogCapabilitySuggestion,
+  type ModelDefinitionDraft,
+} from '@/features/models/advanced';
+import { useModelProtocolManifests } from '@/features/models/hooks';
+import { ModelDefinitionEditor } from './model-definition-editor';
+import type {
+  ModelInfo,
+  ModelTask,
+  ProviderConnectionDescriptor,
+  ProviderConnectionInput,
+} from '@/features/models/types';
+import { a11yState } from '@/utils/a11y';
 
-const MAX_VISIBLE_MODELS = 40;
-
-interface AddProviderSheetProps {
+/**
+ * Mobile translation of the desktop AddPlatformModal.
+ *
+ * The provider form and the model capability editor intentionally share the
+ * same `ModelDefinitionEditor` used by add-model and edit-model. This keeps
+ * protocol defaults, endpoint clearing, connection-role validation and
+ * capability serialization identical across all entry points.
+ */
+export function AddProviderSheet({
+  visible,
+  onClose,
+  onCreated,
+}: {
   visible: boolean;
   onClose: () => void;
   onCreated: () => void;
-}
-
-/**
- * Simple add-provider form. The desktop wizard (996 lines) also does protocol
- * auto-detection on a 1 s type debounce, per-key testing and first-model
- * tagging; here the probe is an explicit button (mobile keyboards + debounce =
- * a probe per keystroke) and tagging is left to the server heuristic.
- */
-export function AddProviderSheet({ visible, onClose, onCreated }: AddProviderSheetProps) {
+}) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
 
   const [presetIndex, setPresetIndex] = useState(0);
-  const preset = PLATFORM_PRESETS[presetIndex];
-  const [name, setName] = useState(PLATFORM_PRESETS[0].label);
-  const [baseUrl, setBaseUrl] = useState(PLATFORM_PRESETS[0].baseUrl);
-  const [apiKey, setApiKey] = useState('');
-  const [revealKey, setRevealKey] = useState(false);
+  const preset = PLATFORM_PRESETS[presetIndex] ?? PLATFORM_PRESETS[0];
+  const [name, setName] = useState(preset.label);
+  const [baseUrl, setBaseUrl] = useState(preset.baseUrl);
+  const [authScheme, setAuthScheme] = useState(preset.defaultAuthScheme ?? 'bearer');
+  const [baseUrlDirty, setBaseUrlDirty] = useState(false);
+  const [authSchemeDirty, setAuthSchemeDirty] = useState(false);
+  const [apiKeysText, setApiKeysText] = useState('');
+  const [revealSecrets, setRevealSecrets] = useState(false);
+  const [bedrockRegion, setBedrockRegion] = useState('us-east-1');
+  const [bedrockProfile, setBedrockProfile] = useState('');
+  const [bedrockAuthMethod, setBedrockAuthMethod] =
+    useState<BedrockAuthMethod>('accessKey');
+  const [bedrockAccessKeyId, setBedrockAccessKeyId] = useState('');
+  const [bedrockSecretAccessKey, setBedrockSecretAccessKey] = useState('');
+  const [bedrockSessionToken, setBedrockSessionToken] = useState('');
 
-  const [testing, setTesting] = useState(false);
-  const [detection, setDetection] = useState<ProtocolDetectionResponse | null>(null);
+  const [definition, setDefinition] = useState<ModelDefinitionDraft>({
+    model: '',
+    capabilities: [],
+  });
   const [catalog, setCatalog] = useState<ModelInfo[] | null>(null);
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-  const [manualModel, setManualModel] = useState('');
-  const [testError, setTestError] = useState('');
-  const [formError, setFormError] = useState('');
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [pendingConnections, setPendingConnections] = useState<
+    ProviderConnectionInput[]
+  >([]);
+  const [connectionEditor, setConnectionEditor] = useState<{
+    task: ModelTask;
+    role: string;
+    roleReadOnly: boolean;
+    baseUrl: string;
+    authScheme: string;
+    label: string;
+    requiresCredentials: boolean;
+  } | null>(null);
+  const [connectionCredentials, setConnectionCredentials] =
+    useState<ConnectionCredentialsDraft>({
+      apiKeysText: '',
+      appKey: '',
+      accessKey: '',
+      resourceId: '',
+      rawJson: '',
+    });
+  const [connectionError, setConnectionError] = useState('');
+  const [connectionSaving, setConnectionSaving] = useState(false);
+  const catalogRequestRef = useRef(0);
 
-  const noCatalogEndpoint = platformHasNoModelsEndpoint(preset.platform);
-  const skipsProbe = platformSkipsPreSaveKeyProbe(preset.platform);
-  const keyCount = apiKeyCount(apiKey);
+  // A hidden sheet may still have an in-flight anonymous catalog request.
+  // Invalidate it immediately on dismissal so a late response cannot hydrate
+  // the next provider draft when the sheet is reopened.
+  useEffect(() => {
+    if (!visible) {
+      catalogRequestRef.current += 1;
+      setCatalogLoading(false);
+    }
+  }, [visible]);
+
+  const selectedTasks = useMemo(
+    () => definition.capabilities.map((capability) => capability.task),
+    [definition.capabilities],
+  );
+  // Always bootstrap chat as well. Besides giving chat forms a useful
+  // recommendation, the manifest response is the backend authority for the
+  // runtime platform/base URL of regional presets.
+  const manifests = useModelProtocolManifests(
+    preset.preset,
+    ['chat', ...selectedTasks],
+    baseUrl,
+  );
+  const bootstrapManifest = manifests.manifests.chat;
+  const firstManifest = selectedTasks
+    .map((task) => manifests.manifests[task])
+    .find((manifest) => manifest !== undefined);
+  const providerManifest = firstManifest ?? bootstrapManifest;
+  const runtimePlatform = providerManifest?.platform ?? preset.platform;
+  const isBedrock = runtimePlatform === 'bedrock' || preset.bedrock === true;
+
+  useEffect(() => {
+    if (!visible) return;
+    if (!baseUrlDirty && !isBedrock && bootstrapManifest?.platform_default_base_url) {
+      setBaseUrl(bootstrapManifest.platform_default_base_url);
+    }
+    if (!authSchemeDirty) {
+      const recommended =
+        bootstrapManifest?.recommendation?.default_auth_scheme ??
+        bootstrapManifest?.default_auth_scheme;
+      if (recommended) setAuthScheme(recommended);
+    }
+  }, [
+    authSchemeDirty,
+    baseUrlDirty,
+    bootstrapManifest,
+    isBedrock,
+    visible,
+  ]);
+
+  const catalogSuggestions = useMemo<CatalogCapabilitySuggestion[]>(
+    () =>
+      (catalog ?? []).map((model) => ({
+        model: model.id,
+        label: model.name ?? model.id,
+        tasks: model.tasks ?? [],
+        traits: model.traits ?? [],
+      })),
+    [catalog],
+  );
+
+  const credentialsResult = useMemo(
+    () =>
+      buildProviderCredentials({
+        isBedrock,
+        mode: 'create',
+        hasStoredCredentials: false,
+        apiKeysText,
+        bedrockAuthMethod,
+        accessKeyId: bedrockAccessKeyId,
+        secretAccessKey: bedrockSecretAccessKey,
+        sessionToken: bedrockSessionToken,
+      }),
+    [
+      apiKeysText,
+      bedrockAccessKeyId,
+      bedrockAuthMethod,
+      bedrockSecretAccessKey,
+      bedrockSessionToken,
+      isBedrock,
+    ],
+  );
+  const bedrockConfig = isBedrock
+    ? buildBedrockConfig(bedrockAuthMethod, bedrockRegion, bedrockProfile)
+    : undefined;
+
+  const validation = validateModelDefinition(
+    definition,
+    manifests.manifests,
+    baseUrl,
+    [],
+    manifests.loadingTasks,
+    pendingConnections.map((connection) => connection.role),
+    authScheme,
+    Object.fromEntries(
+      pendingConnections.map((connection) => [
+        connection.role,
+        connection.auth_scheme,
+      ]),
+    ),
+    pendingConnections.map<ProviderConnectionDescriptor>((connection) => ({
+      role: connection.role,
+      label: connection.label ?? undefined,
+      base_url: connection.base_url,
+      auth_scheme: connection.auth_scheme,
+      has_credentials: true,
+    })),
+  );
 
   const reset = () => {
+    catalogRequestRef.current += 1;
+    setCatalogLoading(false);
+    const first = PLATFORM_PRESETS[0];
     setPresetIndex(0);
-    setName(PLATFORM_PRESETS[0].label);
-    setBaseUrl(PLATFORM_PRESETS[0].baseUrl);
-    setApiKey('');
-    setRevealKey(false);
-    setDetection(null);
+    setName(first.label);
+    setBaseUrl(first.baseUrl);
+    setAuthScheme(first.defaultAuthScheme ?? 'bearer');
+    setBaseUrlDirty(false);
+    setAuthSchemeDirty(false);
+    setApiKeysText('');
+    setRevealSecrets(false);
+    setBedrockRegion('us-east-1');
+    setBedrockProfile('');
+    setBedrockAuthMethod('accessKey');
+    setBedrockAccessKeyId('');
+    setBedrockSecretAccessKey('');
+    setBedrockSessionToken('');
+    setDefinition({ model: '', capabilities: [] });
     setCatalog(null);
-    setQuery('');
-    setSelected([]);
-    setManualModel('');
-    setTestError('');
+    setCatalogError('');
     setFormError('');
+    setPendingConnections([]);
+    setConnectionEditor(null);
+    setConnectionCredentials({
+      apiKeysText: '',
+      appKey: '',
+      accessKey: '',
+      resourceId: '',
+      rawJson: '',
+    });
+    setConnectionError('');
+    setConnectionSaving(false);
   };
 
   const close = () => {
+    if (saving || connectionSaving) return;
     reset();
     onClose();
   };
 
   const pickPreset = (index: number) => {
     const next = PLATFORM_PRESETS[index];
+    if (!next) return;
+    catalogRequestRef.current += 1;
+    setCatalogLoading(false);
     setPresetIndex(index);
     setName(next.requiresName ? '' : next.label);
     setBaseUrl(next.baseUrl);
-    setDetection(null);
+    setAuthScheme(next.defaultAuthScheme ?? 'bearer');
+    setBaseUrlDirty(false);
+    setAuthSchemeDirty(false);
+    setApiKeysText('');
+    setRevealSecrets(false);
+    setBedrockRegion('us-east-1');
+    setBedrockProfile('');
+    setBedrockAuthMethod('accessKey');
+    setBedrockAccessKeyId('');
+    setBedrockSecretAccessKey('');
+    setBedrockSessionToken('');
     setCatalog(null);
-    setSelected([]);
-    setTestError('');
+    setCatalogError('');
     setFormError('');
+    setDefinition({ model: '', capabilities: [] });
+    setPendingConnections([]);
+    setConnectionEditor(null);
+    setConnectionError('');
   };
 
-  const validate = (): boolean => {
-    if (!name.trim()) {
-      setFormError(t('provider.nameRequired'));
-      return false;
-    }
-    if (!isHttpUrl(baseUrl)) {
-      setFormError(t('provider.baseUrlInvalid'));
-      return false;
-    }
-    if (!apiKey.trim()) {
-      setFormError(t('add.keyRequired'));
-      return false;
-    }
-    setFormError('');
-    return true;
+  const openConnectionEditor = (task: ModelTask, role: string) => {
+    const capability = definition.capabilities.find((item) => item.task === task);
+    const manifest = manifests.manifests[task];
+    const descriptor = manifest?.protocols.find(
+      (item) => item.protocol_id === capability?.protocol,
+    );
+    const recommended = descriptor?.default_connections.find(
+      (connection) => (connection.connection_role ?? 'default') === role,
+    );
+    const fallbackBaseUrl =
+      recommended?.base_url ??
+      (role === 'default' ? baseUrl : baseUrl);
+    const fallbackAuth =
+      recommended?.auth_scheme ??
+      manifest?.recommendation?.default_auth_scheme ??
+      (authScheme || 'bearer');
+    setConnectionEditor({
+      task,
+      role,
+      roleReadOnly: !!recommended,
+      baseUrl: fallbackBaseUrl,
+      authScheme: fallbackAuth,
+      label: recommended?.connection_label ?? '',
+      requiresCredentials: recommended?.requires_credentials ?? true,
+    });
+    setConnectionCredentials({
+      apiKeysText: '',
+      appKey: '',
+      accessKey: '',
+      resourceId: '',
+      rawJson: '',
+    });
+    setConnectionError('');
   };
 
-  const runTest = async () => {
-    if (!validate()) return;
-    setTesting(true);
-    setTestError('');
-    setDetection(null);
+  const savePendingConnection = () => {
+    if (!connectionEditor || connectionSaving) return;
+    const role = connectionEditor.role.trim();
+    const connectionBaseUrl = connectionEditor.baseUrl.trim();
+    const scheme = connectionEditor.authScheme.trim();
+    if (!isValidConnectionRole(role)) {
+      setConnectionError(t('connections.roleInvalid'));
+      return;
+    }
+    if (!connectionBaseUrl) {
+      setConnectionError(t('connections.baseUrlRequired'));
+      return;
+    }
+    if (!scheme) {
+      setConnectionError(t('connections.authSchemeRequired'));
+      return;
+    }
+    const built = buildConnectionCredentials(scheme, connectionCredentials);
+    if (!built.ok) {
+      setConnectionError(
+        built.error === 'volc_incomplete'
+          ? t('connections.volcIncomplete')
+          : t('connections.invalidCredentialsJson'),
+      );
+      return;
+    }
+    if (connectionEditor.requiresCredentials && built.credentials === undefined) {
+      setConnectionError(t('connections.credentialsRequired'));
+      return;
+    }
+
+    const input: ProviderConnectionInput = {
+      role,
+      label: connectionEditor.label.trim() || undefined,
+      base_url: connectionBaseUrl,
+      auth_scheme: scheme,
+      credentials: built.credentials ?? {},
+    };
+    setConnectionSaving(true);
     try {
-      if (!skipsProbe) {
-        const result = await detectProtocol({
-          base_url: baseUrl.trim(),
-          api_key: apiKey.trim(),
-          test_all_keys: keyCount > 1,
-        });
-        setDetection(result);
-      }
-      const models = await fetchModelsAnonymous({
-        platform: preset.platform,
-        base_url: baseUrl.trim(),
-        api_key: apiKey.trim(),
-      });
-      setCatalog(models.models);
-      if (models.models.length === 0) setTestError(t('models.fetchFailed'));
-    } catch (err) {
-      setTestError(errorMessage(err, t('test.failed')));
+      setPendingConnections((current) => [
+        ...current.filter((item) => item.role !== role),
+        input,
+      ]);
+      setDefinition((current) => ({
+        ...current,
+        capabilities: current.capabilities.map((capability) =>
+          capability.task === connectionEditor.task
+            ? {
+                ...capability,
+                connectionRole: role,
+                baseUrlOverride: '',
+                allowCrossOriginCredentials: false,
+              }
+            : capability,
+        ),
+      }));
+      setConnectionEditor(null);
+      setConnectionError('');
     } finally {
-      setTesting(false);
+      setConnectionSaving(false);
     }
   };
 
-  const toggleModel = (id: string) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
-  };
+  const loadCatalog = async () => {
+    if (!isBedrock && (!isHttpUrl(baseUrl) || !authScheme.trim())) {
+      setCatalogError(t('add.catalogNeedsCredentials'));
+      return;
+    }
+    if (!credentialsResult.ok || credentialsResult.credentials === undefined) {
+      setCatalogError(t('add.catalogNeedsCredentials'));
+      return;
+    }
+    if (isBedrock && !bedrockRegion.trim()) {
+      setCatalogError(t('add.bedrockRegionRequired'));
+      return;
+    }
+    if (isBedrock && bedrockAuthMethod === 'profile' && !bedrockProfile.trim()) {
+      setCatalogError(t('add.bedrockProfileRequired'));
+      return;
+    }
 
-  const addManual = () => {
-    const id = manualModel.trim();
-    if (!id) return;
-    if (!selected.includes(id)) setSelected((prev) => [...prev, id]);
-    setManualModel('');
+    const requestId = ++catalogRequestRef.current;
+    setCatalogLoading(true);
+    setCatalogError('');
+    try {
+      const result = await fetchModelsAnonymous({
+        platform: runtimePlatform,
+        base_url: isBedrock ? '' : baseUrl.trim(),
+        auth_scheme: authScheme.trim(),
+        credentials: credentialsResult.credentials,
+        ...(bedrockConfig ? { bedrock_config: bedrockConfig } : {}),
+        try_fix: true,
+      });
+      if (requestId !== catalogRequestRef.current || !visible) return;
+      setCatalog(result.models);
+      if (result.fixed_base_url && !baseUrlDirty) {
+        setBaseUrl(result.fixed_base_url);
+      }
+      if (result.models.length === 0) {
+        setCatalogError(t('models.fetchFailed'));
+      }
+    } catch (error) {
+      if (requestId === catalogRequestRef.current && visible) {
+        setCatalogError(errorMessage(error, t('models.fetchFailed')));
+      }
+    } finally {
+      if (requestId === catalogRequestRef.current) setCatalogLoading(false);
+    }
   };
 
   const save = async () => {
-    if (!validate()) return;
+    if (saving) return;
+    setFormError('');
+    if (!name.trim()) {
+      setFormError(t('provider.nameRequired'));
+      return;
+    }
+    if (!isBedrock && !isHttpUrl(baseUrl)) {
+      setFormError(t('provider.baseUrlInvalid'));
+      return;
+    }
+    if (!authScheme.trim()) {
+      setFormError(t('add.authSchemeRequired'));
+      return;
+    }
+    if (isBedrock && !bedrockRegion.trim()) {
+      setFormError(t('add.bedrockRegionRequired'));
+      return;
+    }
+    if (isBedrock && bedrockAuthMethod === 'profile' && !bedrockProfile.trim()) {
+      setFormError(t('add.bedrockProfileRequired'));
+      return;
+    }
+    if (!credentialsResult.ok || credentialsResult.credentials === undefined) {
+      setFormError(
+        isBedrock
+          ? t('add.bedrockCredentialsRequired')
+          : t('add.keyRequired'),
+      );
+      return;
+    }
+    if (!validation.valid) {
+      setFormError(t('add.capabilityInvalid'));
+      return;
+    }
+    const capabilities = capabilityInputsFromDefinition(definition);
+    if (!capabilities || capabilities.length === 0) {
+      setFormError(t('add.capabilityInvalid'));
+      return;
+    }
+
     setSaving(true);
     try {
       await createProvider({
-        platform: preset.platform,
+        platform: runtimePlatform,
         name: name.trim(),
-        base_url: baseUrl.trim(),
-        api_key: apiKey.trim(),
-        models: selected,
+        base_url: isBedrock ? '' : baseUrl.trim(),
+        auth_scheme: authScheme.trim(),
+        credentials: credentialsResult.credentials,
+        ...(bedrockConfig ? { bedrock_config: bedrockConfig } : {}),
+        initial_model: {
+          model: normalizeModelId(definition.model),
+          enabled: true,
+          capabilities,
+        },
+        ...(pendingConnections.length > 0
+          ? { connections: pendingConnections }
+          : {}),
       });
-      toast.success(t('add.created', { name: name.trim() }));
       reset();
       onCreated();
-    } catch (err) {
-      setFormError(t('add.createFailed', { message: errorMessage(err, tc('feedback.requestFailed')) }));
+      toast.success(t('add.created', { name: name.trim() }));
+    } catch (error) {
+      setFormError(
+        t('add.createFailed', {
+          message: errorMessage(error, tc('feedback.requestFailed')),
+        }),
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const filtered = (catalog ?? []).filter((m) =>
-    query.trim() ? m.id.toLowerCase().includes(query.trim().toLowerCase()) : true,
-  );
-  const visibleModels = filtered.slice(0, MAX_VISIBLE_MODELS);
-
   return (
     <Sheet
       visible={visible}
       title={t('add.title')}
+      closeDisabled={saving || connectionSaving}
       onClose={close}
       footer={
-        <Button onPress={save} loading={saving}>
+        <Button
+          onPress={() => void save()}
+          loading={saving}
+          disabled={!validation.valid}
+        >
           {t('add.submit')}
         </Button>
       }
     >
-      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('add.platform')}</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        {t('add.platform')}
+      </Text>
       <View style={styles.chips}>
         {PLATFORM_PRESETS.map((item, index) => {
           const active = index === presetIndex;
           return (
             <Pressable
-              key={`${item.platform}-${item.label}`}
+              key={`${item.preset}-${item.platform}`}
               accessibilityRole="button"
+              disabled={saving}
+              {...a11yState({ selected: active, disabled: saving })}
               onPress={() => pickPreset(index)}
               style={[
                 styles.chip,
                 {
                   backgroundColor: active ? colors.primarySoft : colors.surface,
                   borderColor: active ? colors.primary : colors.border,
+                  opacity: saving ? 0.5 : 1,
                 },
               ]}
             >
               <Text
-                style={[styles.chipText, { color: active ? colors.primary : colors.textSecondary }]}
+                style={[
+                  styles.chipText,
+                  { color: active ? colors.primary : colors.textSecondary },
+                ]}
               >
                 {item.label}
               </Text>
@@ -209,155 +560,351 @@ export function AddProviderSheet({ visible, onClose, onCreated }: AddProviderShe
           );
         })}
       </View>
-      <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('add.platformHint')}</Text>
+      <Text style={[styles.hint, { color: colors.textTertiary }]}>
+        {t('add.platformHint')}
+      </Text>
 
-      <View style={styles.spacer} />
       <TextField
         label={t('provider.name')}
         value={name}
         onChangeText={setName}
         hint={t('add.nameHint')}
         placeholder={preset.label}
+        editable={!saving}
       />
+      {!isBedrock ? (
+        <TextField
+          label={t('provider.baseUrl')}
+          value={baseUrl}
+          onChangeText={(value) => {
+            setBaseUrlDirty(true);
+            setBaseUrl(value);
+          }}
+          placeholder="https://api.example.com/v1"
+          keyboardType="url"
+          autoComplete="off"
+          editable={!saving}
+        />
+      ) : null}
       <TextField
-        label={t('provider.baseUrl')}
-        value={baseUrl}
-        onChangeText={setBaseUrl}
-        placeholder="https://api.example.com/v1"
-        keyboardType="url"
+        label={t('provider.authScheme')}
+        value={authScheme}
+        onChangeText={(value) => {
+          setAuthSchemeDirty(true);
+          setAuthScheme(value);
+        }}
+        placeholder="bearer / header_key:x-api-key"
         autoComplete="off"
+        editable={!saving}
       />
-      <TextField
-        label={t('provider.apiKey')}
-        value={apiKey}
-        onChangeText={setApiKey}
-        placeholder={t('provider.apiKeyPlaceholder')}
-        secureTextEntry={!revealKey}
-        multiline={revealKey}
-        autoComplete="off"
-        hint={keyCount > 1 ? t('provider.apiKeyMasked', { count: keyCount }) : t('provider.apiKeyEditHint')}
-      />
-      <Pressable accessibilityRole="button" onPress={() => setRevealKey((v) => !v)} hitSlop={8}>
+
+      {isBedrock ? (
+        <>
+          <TextField
+            label={t('provider.bedrockRegion')}
+            value={bedrockRegion}
+            onChangeText={setBedrockRegion}
+            editable={!saving}
+          />
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {t('provider.bedrockAuthMethod')}
+          </Text>
+          <View style={styles.chips}>
+            {(['accessKey', 'profile', 'defaultChain'] as const).map((method) => {
+              const active = method === bedrockAuthMethod;
+              return (
+                <Pressable
+                  key={method}
+                  accessibilityRole="button"
+                  disabled={saving}
+                  {...a11yState({ selected: active, disabled: saving })}
+                  onPress={() => setBedrockAuthMethod(method)}
+                  style={[
+                    styles.chip,
+                    {
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primarySoft : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? colors.primary : colors.textSecondary },
+                    ]}
+                  >
+                    {t(`provider.bedrockAuth.${method}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {bedrockAuthMethod === 'profile' ? (
+            <TextField
+              label={t('provider.bedrockProfile')}
+              value={bedrockProfile}
+              onChangeText={setBedrockProfile}
+              placeholder="default"
+              editable={!saving}
+            />
+          ) : null}
+          {bedrockAuthMethod === 'accessKey' ? (
+            <>
+              <TextField
+                label={t('provider.bedrockAccessKeyId')}
+                value={bedrockAccessKeyId}
+                onChangeText={setBedrockAccessKeyId}
+                secureTextEntry={!revealSecrets}
+                editable={!saving}
+              />
+              <TextField
+                label={t('provider.bedrockSecretAccessKey')}
+                value={bedrockSecretAccessKey}
+                onChangeText={setBedrockSecretAccessKey}
+                secureTextEntry={!revealSecrets}
+                editable={!saving}
+              />
+              <TextField
+                label={t('provider.bedrockSessionToken')}
+                value={bedrockSessionToken}
+                onChangeText={setBedrockSessionToken}
+                secureTextEntry={!revealSecrets}
+                editable={!saving}
+              />
+            </>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <TextField
+            label={t('provider.apiKey')}
+            value={apiKeysText}
+            onChangeText={setApiKeysText}
+            placeholder={t('provider.apiKeyPlaceholder')}
+            secureTextEntry={!revealSecrets}
+            multiline={revealSecrets}
+            autoComplete="off"
+            hint={t('provider.apiKeyEditHint')}
+            editable={!saving}
+          />
+        </>
+      )}
+      <Pressable
+        accessibilityRole="button"
+        disabled={saving}
+        {...a11yState({ disabled: saving })}
+        onPress={() => setRevealSecrets((value) => !value)}
+        hitSlop={8}
+      >
         <Text style={[styles.link, { color: colors.primary }]}>
-          {revealKey ? t('provider.hide') : t('provider.reveal')}
+          {revealSecrets ? t('provider.hide') : t('provider.reveal')}
         </Text>
       </Pressable>
 
-      <View style={styles.spacer} />
-      <Button variant="secondary" onPress={runTest} loading={testing}>
-        {testing ? t('test.testing') : t('add.fetchAndTest')}
-      </Button>
-      {noCatalogEndpoint ? (
-        <Text style={[styles.hint, { color: colors.warning }]}>{t('test.skipHint')}</Text>
-      ) : null}
-      {detection ? (
-        <View style={[styles.result, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <Text
-            style={[
-              styles.resultTitle,
-              { color: detection.success ? colors.success : colors.danger },
-            ]}
-          >
-            {detection.success ? t('test.success', { protocol: detection.protocol }) : t('test.failed')}
-          </Text>
-          {detection.multi_key_result ? (
-            <Text style={[styles.hint, { color: colors.textSecondary }]}>
-              {t('test.keys', {
-                valid: detection.multi_key_result.valid,
-                total: detection.multi_key_result.total,
-              })}
-            </Text>
-          ) : null}
-          {detection.suggestion && detection.suggestion.type !== 'none' ? (
-            <Text style={[styles.hint, { color: colors.warning }]}>
-              {detection.suggestion.message}
-            </Text>
-          ) : null}
-          {detection.fixed_base_url ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setBaseUrl(detection.fixed_base_url ?? baseUrl)}
-            >
-              <Text style={[styles.link, { color: colors.primary }]}>
-                {t('test.fixedBaseUrl', { url: detection.fixed_base_url })}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      {testError ? <Text style={[styles.error, { color: colors.danger }]}>{testError}</Text> : null}
+      <ModelDefinitionEditor
+        value={definition}
+        onChange={setDefinition}
+        providerBaseUrl={baseUrl}
+        providerAuthScheme={authScheme}
+        manifests={manifests.manifests}
+        manifestLoadingTasks={manifests.loadingTasks}
+        manifestErrorTasks={manifests.errorTasks}
+        validationErrors={validation.errors}
+        disabled={saving || connectionSaving}
+        catalogSuggestions={catalogSuggestions}
+        catalogLoading={catalogLoading}
+        catalogError={catalogError}
+        onRefreshCatalog={() => void loadCatalog()}
+        connections={pendingConnections.map<ProviderConnectionDescriptor>((connection) => ({
+          role: connection.role,
+          label: connection.label ?? undefined,
+          base_url: connection.base_url,
+          auth_scheme: connection.auth_scheme,
+          has_credentials: true,
+        }))}
+        onRequestConnection={openConnectionEditor}
+      />
 
-      {catalog ? (
-        <>
-          <View style={styles.spacer} />
+      {connectionEditor ? (
+        <View
+          style={[
+            styles.connectionEditor,
+            { borderColor: colors.warning, backgroundColor: colors.warningSoft },
+          ]}
+        >
+          <Text style={[styles.label, { color: colors.warning }]}>
+            {t('connections.inlineTitle', { role: connectionEditor.role })}
+          </Text>
+          <Text style={[styles.hint, { color: colors.warning }]}>
+            {t('connections.inlineHint')}
+          </Text>
+          <TextField
+            label={t('connections.role')}
+            value={connectionEditor.role}
+            editable={!connectionEditor.roleReadOnly && !connectionSaving}
+            onChangeText={(role) =>
+              setConnectionEditor((current) => (current ? { ...current, role } : current))
+            }
+            placeholder="voice"
+          />
+          <TextField
+            label={t('connections.label')}
+            value={connectionEditor.label}
+            editable={!connectionSaving}
+            onChangeText={(label) =>
+              setConnectionEditor((current) => (current ? { ...current, label } : current))
+            }
+            placeholder={t('connections.labelPlaceholder')}
+          />
+          <TextField
+            label={t('connections.baseUrl')}
+            value={connectionEditor.baseUrl}
+            editable={!connectionSaving}
+            onChangeText={(baseUrl) =>
+              setConnectionEditor((current) => (current ? { ...current, baseUrl } : current))
+            }
+            keyboardType="url"
+          />
           <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('add.pickModels')} · {t('add.selected', { count: selected.length })}
+            {t('connections.authScheme')}
           </Text>
+          <View style={styles.chips}>
+            {AUTH_SCHEME_PRESETS.map((option) => {
+              const active = connectionEditor.authScheme === option;
+              return (
+                <Pressable
+                  key={option}
+                  accessibilityRole="button"
+                  disabled={connectionSaving}
+                  {...a11yState({ selected: active, disabled: connectionSaving })}
+                  onPress={() =>
+                    setConnectionEditor((current) =>
+                      current ? { ...current, authScheme: option } : current,
+                    )
+                  }
+                  style={[
+                    styles.chip,
+                    {
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primarySoft : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? colors.primary : colors.textSecondary },
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <TextField
-            value={query}
-            onChangeText={setQuery}
-            placeholder={tc('actions.search')}
-            autoComplete="off"
+            label={t('connections.authSchemeCustom')}
+            value={connectionEditor.authScheme}
+            editable={!connectionSaving}
+            onChangeText={(authScheme) =>
+              setConnectionEditor((current) => (current ? { ...current, authScheme } : current))
+            }
+            placeholder={t('connections.authSchemeCustomPlaceholder')}
           />
-          {visibleModels.map((item) => {
-            const active = selected.includes(item.id);
-            return (
-              <Pressable
-                key={item.id}
-                accessibilityRole="button"
-                onPress={() => toggleModel(item.id)}
-                style={({ pressed }) => [
-                  styles.modelRow,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={active ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={20}
-                  color={active ? colors.primary : colors.textTertiary}
-                />
-                <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
-                  {item.id}
-                </Text>
-              </Pressable>
-            );
-          })}
-          {filtered.length > visibleModels.length ? (
-            <Text style={[styles.hint, { color: colors.textTertiary }]}>
-              {t('add.moreModels', { count: filtered.length - visibleModels.length })}
-            </Text>
+          {credentialsKindForScheme(connectionEditor.authScheme) === 'api_keys' ? (
+            <TextField
+              label={t('connections.credentials')}
+              value={connectionCredentials.apiKeysText}
+              editable={!connectionSaving}
+              onChangeText={(apiKeysText) =>
+                setConnectionCredentials((current) => ({ ...current, apiKeysText }))
+              }
+              placeholder={t('connections.apiKeys')}
+              multiline
+              numberOfLines={3}
+              secureTextEntry
+            />
           ) : null}
-        </>
+          {credentialsKindForScheme(connectionEditor.authScheme) === 'volc_voice' ? (
+            <>
+              <TextField
+                label={t('connections.volcAppKey')}
+                value={connectionCredentials.appKey}
+                editable={!connectionSaving}
+                onChangeText={(appKey) =>
+                  setConnectionCredentials((current) => ({ ...current, appKey }))
+                }
+                secureTextEntry
+              />
+              <TextField
+                label={t('connections.volcAccessKey')}
+                value={connectionCredentials.accessKey}
+                editable={!connectionSaving}
+                onChangeText={(accessKey) =>
+                  setConnectionCredentials((current) => ({ ...current, accessKey }))
+                }
+                secureTextEntry
+              />
+              <TextField
+                label={t('connections.volcResourceId')}
+                value={connectionCredentials.resourceId}
+                editable={!connectionSaving}
+                onChangeText={(resourceId) =>
+                  setConnectionCredentials((current) => ({ ...current, resourceId }))
+                }
+              />
+            </>
+          ) : null}
+          {credentialsKindForScheme(connectionEditor.authScheme) === 'custom' ? (
+            <TextField
+              label={t('connections.credentials')}
+              value={connectionCredentials.rawJson}
+              editable={!connectionSaving}
+              onChangeText={(rawJson) =>
+                setConnectionCredentials((current) => ({ ...current, rawJson }))
+              }
+              placeholder={t('connections.rawCredentials')}
+              multiline
+              numberOfLines={4}
+            />
+          ) : null}
+          {connectionError ? (
+            <Text style={[styles.error, { color: colors.danger }]}>{connectionError}</Text>
+          ) : null}
+          <View style={styles.inlineActions}>
+            <Button
+              small
+              variant="ghost"
+              disabled={connectionSaving}
+              onPress={() => {
+                setConnectionEditor(null);
+                setConnectionError('');
+              }}
+            >
+              {tc('actions.cancel')}
+            </Button>
+            <Button
+              small
+              variant="secondary"
+              loading={connectionSaving}
+              onPress={savePendingConnection}
+            >
+              {t('connections.inlineSave')}
+            </Button>
+          </View>
+        </View>
       ) : null}
 
-      <View style={styles.spacer} />
-      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('models.addManual')}</Text>
-      <View style={styles.manualRow}>
-        <View style={styles.manualField}>
-          <TextField
-            value={manualModel}
-            onChangeText={setManualModel}
-            placeholder={t('models.modelId')}
-            autoComplete="off"
-            onSubmitEditing={addManual}
-          />
-        </View>
-        <Button small variant="secondary" onPress={addManual} disabled={!manualModel.trim()}>
-          {tc('actions.create')}
-        </Button>
-      </View>
-      {selected.length > 0 ? (
-        <Text style={[styles.hint, { color: colors.textSecondary }]}>
-          {t('add.selectedList', { models: selected.join('、') })}
+      {platformHasNoModelsEndpoint(runtimePlatform) ? (
+        <Text style={[styles.hint, { color: colors.warning }]}>
+          {t('test.skipHint')}
         </Text>
-      ) : (
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('add.pickModelsHint')}</Text>
-      )}
-
-      {formError ? <Text style={[styles.error, { color: colors.danger }]}>{formError}</Text> : null}
+      ) : null}
+      {formError ? (
+        <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>
+          {formError}
+        </Text>
+      ) : null}
     </Sheet>
   );
 }
@@ -367,8 +914,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: FontSize.xs, lineHeight: 17 },
   link: { fontSize: FontSize.sm, fontWeight: '600', paddingVertical: Spacing.xs },
   error: { fontSize: FontSize.sm, lineHeight: 19, marginTop: Spacing.xs },
-  spacer: { height: Spacing.md },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.xs },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   chip: {
     borderWidth: 1,
     borderRadius: Radius.full,
@@ -378,25 +924,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipText: { fontSize: FontSize.sm, fontWeight: '600' },
-  result: {
+  connectionEditor: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     padding: Spacing.md,
-    marginTop: Spacing.sm,
-    gap: 4,
+    gap: Spacing.xs,
   },
-  resultTitle: { fontSize: FontSize.sm, fontWeight: '700' },
-  modelRow: {
+  inlineActions: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: Spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    minHeight: 46,
-    marginBottom: Spacing.xs,
+    marginTop: Spacing.xs,
   },
-  modelName: { flex: 1, fontSize: FontSize.sm },
-  manualRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
-  manualField: { flex: 1 },
 });

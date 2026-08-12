@@ -11,14 +11,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 import { FontSize, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 
 interface SheetProps extends PropsWithChildren {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /** Prevent dismissal while a nested form is committing a write. */
+  closeDisabled?: boolean;
   /** Sticky area under the scrollable body (primary action). */
   footer?: React.ReactNode;
 }
@@ -28,17 +32,33 @@ interface SheetProps extends PropsWithChildren {
  * `Modal` is implemented by react-native-web too, so this works on all three
  * targets without a platform branch.
  */
-export function Sheet({ visible, title, onClose, footer, children }: SheetProps) {
+export function Sheet({
+  visible,
+  title,
+  onClose,
+  closeDisabled = false,
+  footer,
+  children,
+}: SheetProps) {
   const { colors } = useTheme();
+  const { t: tc } = useTranslation('common');
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (!closeDisabled) onClose();
+      }}
+    >
       <View style={styles.fill}>
         <Pressable
           accessible={false}
+          disabled={closeDisabled}
           style={[styles.backdrop, { backgroundColor: colors.overlay }]}
-          onPress={onClose}
+          onPress={closeDisabled ? undefined : onClose}
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -60,9 +80,12 @@ export function Sheet({ visible, title, onClose, footer, children }: SheetProps)
               </Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={onClose}
+                accessibilityLabel={tc('actions.close')}
+                disabled={closeDisabled}
+                {...a11yState({ disabled: closeDisabled })}
+                onPress={closeDisabled ? undefined : onClose}
                 hitSlop={12}
-                style={styles.close}
+                style={[styles.close, { opacity: closeDisabled ? 0.45 : 1 }]}
               >
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </Pressable>

@@ -1,197 +1,225 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
 
 import { Button, toast } from '@/components/ui';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { a11yState } from '@/utils/a11y';
-import { setProviderModelTasks } from '@/features/models/api';
 import { Sheet } from '@/features/models/components/sheet';
-import { errorMessage } from '@/features/models/errors';
-import { canSaveTasks, sortTasks, toggleTask } from '@/features/models/tasks';
+import { useModelProtocolManifests, useProviderConnections } from '@/features/models/hooks';
 import {
-  MODEL_TASK_ORDER,
-  MODEL_TRAIT_ORDER,
-  type ModelTask,
-  type ProviderModelResponse,
-} from '@/features/models/types';
+  capabilityDraftFromResponse,
+  capabilityInputsFromDefinition,
+  validateModelDefinition,
+  type ModelDefinitionDraft,
+} from '@/features/models/advanced';
+import { saveProviderModel } from '@/features/models/api';
+import { errorMessage } from '@/features/models/errors';
+import type { ProviderModelResponse, ProviderConnectionDescriptor } from '@/features/models/types';
+import { ModelDefinitionEditor } from './model-definition-editor';
+import { ProviderConnectionSheet } from './provider-connection-sheet';
 
 interface ModelTasksSheetProps {
   visible: boolean;
   row: ProviderModelResponse | null;
+  providerPlatform?: string;
+  providerBaseUrl?: string;
+  providerAuthScheme?: string;
+  existingModelIds?: readonly string[];
   onClose: () => void;
-  /** Called with the server's row so the caller can patch its cache. */
   onSaved: (row: ProviderModelResponse) => void;
 }
 
 /**
- * 任务标签 editor — the one piece of the desktop's 模态能力 popover that belongs
- * on a phone: it decides which selectors the model appears in, and an untagged
- * row is invisible everywhere.
- *
- * Writes `POST /api/provider-models/update {provider_id, model, tasks}`; every
- * other column stays absent so it keeps its stored value. Traits, context
- * limit, protocol, connection role and the failover queue are heavier
- * assets and stay on the desktop — they are shown here read-only.
- *
- * A toast fired inside an RN `Modal` hides underneath it on native, so errors
- * are also rendered inline.
+ * The desktop calls this control an advanced model editor. On mobile it is
+ * still a sheet, but it edits the complete capability graph atomically rather
+ * than writing a legacy task-only patch.
  */
-export function ModelTasksSheet({ visible, row, onClose, onSaved }: ModelTasksSheetProps) {
+export function ModelTasksSheet({
+  visible,
+  row,
+  providerPlatform = '',
+  providerBaseUrl = '',
+  providerAuthScheme = '',
+  existingModelIds = [],
+  onClose,
+  onSaved,
+}: ModelTasksSheetProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
-
-  const [draft, setDraft] = useState<ModelTask[]>([]);
-  const [seededFor, setSeededFor] = useState<string | null>(null);
+  const [definition, setDefinition] = useState<ModelDefinitionDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [connectionRequest, setConnectionRequest] = useState<{
+    role: string;
+    baseUrl?: string;
+    authScheme?: string;
+  } | null>(null);
+  const initializedKeyRef = useRef<string | null>(null);
 
-  const model = row?.model ?? '';
-  const stored = row ? sortTasks(row.tasks) : [];
+  const selectedTasks = useMemo(
+    () => definition?.capabilities.map((capability) => capability.task) ?? [],
+    [definition],
+  );
+  const manifests = useModelProtocolManifests(
+    providerPlatform,
+    selectedTasks,
+    providerBaseUrl,
+  );
+  const connectionState = useProviderConnections(row?.provider_id ?? '', visible && !!row);
+  const connections: ProviderConnectionDescriptor[] = connectionState.connections.map(
+    (connection) => ({
+      role: connection.role,
+      label: connection.label,
+      base_url: connection.base_url,
+      auth_scheme: connection.auth_scheme,
+      has_credentials: connection.has_credentials,
+    }),
+  );
+  const validation = definition
+    ? validateModelDefinition(
+        definition,
+        manifests.manifests,
+        providerBaseUrl,
+        existingModelIds.filter((model) => model !== row?.model),
+        manifests.loadingTasks,
+        connections.map((connection) => connection.role),
+        providerAuthScheme,
+        Object.fromEntries(
+          connections.map((connection) => [connection.role, connection.auth_scheme]),
+        ),
+        connections,
+      )
+    : { valid: false, errors: [] };
 
-  // Seed the draft when the sheet opens on a row (React's "adjust state when a
-  // prop changes" pattern). Deliberately keyed on the model, not on the row
-  // object: a background revalidation of the catalog must not wipe the picks
-  // the user is in the middle of making.
-  if (visible && seededFor !== model) {
-    setSeededFor(model);
-    setDraft(stored);
+  useEffect(() => {
+    if (!visible || !row) {
+      initializedKeyRef.current = null;
+      return;
+    }
+    const key = `${row.provider_id}\u0000${row.model}`;
+    if (initializedKeyRef.current === key) return;
+    initializedKeyRef.current = key;
+    setDefinition({
+      model: row.model,
+      enabled: row.enabled,
+      description: row.description,
+      sortOrder: row.sort_order,
+      capabilities: row.capabilities.map(capabilityDraftFromResponse),
+    });
     setError('');
-  } else if (!visible && seededFor !== null) {
-    setSeededFor(null);
-  }
+    setConnectionRequest(null);
+  }, [row, visible]);
 
   const close = () => {
-    if (saving) return;
-    onClose();
+    if (!saving) onClose();
   };
 
-  const save = () => {
-    if (!row || saving) return;
-    setSaving(true);
+  const requestConnection = (
+    task: Parameters<
+      NonNullable<ComponentProps<typeof ModelDefinitionEditor>['onRequestConnection']>
+    >[0],
+    requestedRole: string,
+  ) => {
+    const capability = definition?.capabilities.find((candidate) => candidate.task === task);
+    const descriptor = manifests.manifests[task]?.protocols.find(
+      (protocol) => protocol.protocol_id === capability?.protocol,
+    );
+    const role = requestedRole.trim() || 'default';
+    const recommended = descriptor?.default_connections.find(
+      (connection) => (connection.connection_role ?? 'default') === role,
+    );
+    setConnectionRequest({
+      role,
+      baseUrl: recommended?.base_url ?? providerBaseUrl,
+      authScheme: recommended?.auth_scheme ?? providerAuthScheme,
+    });
+  };
+
+  const save = async () => {
+    if (!row || !definition || saving) return;
     setError('');
-    void (async () => {
-      try {
-        const updated = await setProviderModelTasks(row.provider_id, row.model, draft);
-        onSaved(updated);
-        // Close BEFORE the toast: on native a toast fired while a Modal is open
-        // renders underneath it.
-        onClose();
-        toast.success(tc('feedback.saved'));
-      } catch (err) {
-        setError(errorMessage(err, tc('feedback.requestFailed')));
-      } finally {
-        setSaving(false);
-      }
-    })();
+    if (!validation.valid) {
+      setError(t('editor.capabilityInvalid'));
+      return;
+    }
+    const capabilities = capabilityInputsFromDefinition(definition);
+    if (!capabilities || capabilities.length === 0) {
+      setError(t('editor.capabilityInvalid'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await saveProviderModel({
+        provider_id: row.provider_id,
+        model: {
+          model: row.model,
+          enabled: definition.enabled,
+          ...(definition.description === undefined
+            ? {}
+            : { description: definition.description.trim() || undefined }),
+          sort_order: definition.sortOrder,
+          capabilities,
+        },
+      });
+      onSaved(updated);
+      onClose();
+      toast.success(tc('feedback.saved'));
+    } catch (reason) {
+      setError(errorMessage(reason, tc('feedback.requestFailed')));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Sheet
-      visible={visible}
-      title={t('tasksEdit.title')}
-      onClose={close}
-      footer={
-        <Button onPress={save} loading={saving} disabled={!canSaveTasks(draft, stored)}>
-          {tc('actions.save')}
-        </Button>
-      }
-    >
-      <Text style={[styles.model, { color: colors.text }]} numberOfLines={2}>
-        {model}
-      </Text>
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('tasksEdit.hint')}</Text>
-
-      {MODEL_TASK_ORDER.map((task) => {
-        const checked = draft.includes(task);
-        return (
-          <Pressable
-            key={task}
-            accessibilityRole="checkbox"
-            {...a11yState({ checked })}
-            disabled={saving}
-            onPress={() => setDraft((current) => toggleTask(current, task))}
-            style={({ pressed }) => [
-              styles.option,
-              {
-                borderColor: checked ? colors.primary : colors.border,
-                backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-              },
-            ]}
+    <>
+      <Sheet
+        visible={visible && !!row && !!definition && connectionRequest === null}
+        title={t('editor.title')}
+        closeDisabled={saving}
+        onClose={close}
+        footer={
+          <Button
+            onPress={() => void save()}
+            loading={saving}
+            disabled={!definition || !validation.valid || connectionState.isLoading}
           >
-            <Ionicons
-              name={checked ? 'checkbox' : 'square-outline'}
-              size={20}
-              color={checked ? colors.primary : colors.textTertiary}
-            />
-            <Text style={[styles.optionLabel, { color: colors.text }]} numberOfLines={1}>
-              {t(`task.${task}`)}
-            </Text>
-          </Pressable>
-        );
-      })}
-
-      {draft.length === 0 ? (
-        <Text style={[styles.warning, { color: colors.warning }]}>{t('tasksEdit.emptyBlocked')}</Text>
-      ) : null}
-      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
-
-      <View style={[styles.desktop, { borderTopColor: colors.border }]}>
-        <Text style={[styles.desktopTitle, { color: colors.textSecondary }]}>
-          {t('tasksEdit.desktopTitle')}
-        </Text>
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>
-          {t('tasksEdit.traitsRow', {
-            value:
-              row && row.traits.length > 0
-                ? MODEL_TRAIT_ORDER.filter((trait) => row.traits.includes(trait))
-                    .map((trait) => t(`trait.${trait}`))
-                    .join(' · ')
-                : t('tasksEdit.none'),
-          })}
-        </Text>
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>
-          {t('tasksEdit.contextRow', {
-            value: row?.context_limit ? String(row.context_limit) : t('tasksEdit.default'),
-          })}
-        </Text>
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>
-          {t('tasksEdit.protocolRow', {
-            value: row?.protocol || t('tasksEdit.auto'),
-            role: row?.connection_role || t('tasksEdit.none'),
-          })}
-        </Text>
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>
-          {t('tasksEdit.desktopHint')}
-        </Text>
-      </View>
-    </Sheet>
+            {tc('actions.save')}
+          </Button>
+        }
+      >
+        {definition ? (
+          <ModelDefinitionEditor
+            value={definition}
+            onChange={setDefinition}
+            providerBaseUrl={providerBaseUrl}
+            providerAuthScheme={providerAuthScheme}
+            manifests={manifests.manifests}
+            manifestLoadingTasks={manifests.loadingTasks}
+            manifestErrorTasks={manifests.errorTasks}
+            validationErrors={validation.errors}
+            validationPending={connectionState.isLoading}
+            disabled={saving}
+            modelReadOnly
+            connections={connections}
+            onRequestConnection={requestConnection}
+          />
+        ) : null}
+        {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
+      </Sheet>
+      <ProviderConnectionSheet
+        visible={visible && !!row && connectionRequest !== null}
+        providerId={row?.provider_id ?? ''}
+        prefillRole={connectionRequest?.role}
+        prefillBaseUrl={connectionRequest?.baseUrl}
+        prefillScheme={connectionRequest?.authScheme}
+        onClose={() => setConnectionRequest(null)}
+        onSaved={() => {
+          setConnectionRequest(null);
+          void connectionState.mutate();
+        }}
+      />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  model: { fontSize: FontSize.md, fontWeight: '700' },
-  hint: { fontSize: FontSize.xs, lineHeight: 17 },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    minHeight: 46,
-  },
-  optionLabel: { flex: 1, fontSize: FontSize.sm, fontWeight: '500' },
-  warning: { fontSize: FontSize.xs, lineHeight: 17 },
-  error: { fontSize: FontSize.sm, lineHeight: 19 },
-  desktop: {
-    gap: 4,
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  desktopTitle: { fontSize: FontSize.sm, fontWeight: '600' },
-});

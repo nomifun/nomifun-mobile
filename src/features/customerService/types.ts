@@ -129,9 +129,16 @@ export interface ProviderSummary {
   name: string;
   platform: string;
   enabled: boolean;
+  /** Optional for tolerant legacy fixtures and cached snapshots. */
+  models?: Array<{
+    model: string;
+    enabled: boolean;
+    sort_order: number;
+    capabilities: Array<{ task: string }>;
+  }>;
 }
 
-/** One (provider, model) pair returned by `POST /api/model-profiles/resolve`. */
+/** One enabled (provider, model) pair derived from nested capabilities. */
 export interface CatalogModelRef {
   provider_id: string;
   model: string;

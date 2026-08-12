@@ -1,16 +1,11 @@
 /**
- * SWR hooks for 模型管理.
+ * SWR hooks for the provider/model graph.
  *
- * There are no WS topics for providers/models in the desktop protocol
- * (docs/research/ws-protocol.md has none), so realtime = refetch on
- * `ws.reconnected` plus pull-to-refresh.
- *
- * Every hook distinguishes "request errored" from "catalog is empty": a
- * transient failure must never be read as "the user has no models", otherwise
- * consumers would purge persisted model references. That footgun is already
- * documented in the desktop research doc (§6).
+ * Management reads all rows, including disabled rows. Runtime selectors derive
+ * their candidates from the same nested provider response, but filter to
+ * enabled providers, enabled models and the exact requested capability.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 
 import { useWsTopic } from '@/hooks/use-ws';
@@ -18,34 +13,55 @@ import { useWsTopic } from '@/hooks/use-ws';
 import {
   CLIENT_SETTINGS_KEY,
   PROVIDERS_KEY,
+  modelProtocolsKey,
   pickClientDefaults,
+  providerConnectionsKey,
   providerModelsKey,
-  resolveKey,
-  resolveModelsForTask,
+  fetchModelProtocolManifest,
+  listProviderConnections,
 } from './api';
 import { isManagedProvider } from './platforms';
-import type { ClientDefaults, ModelRef, ModelTask, ProviderModelResponse, ProviderResponse } from './types';
+import type {
+  ClientDefaults,
+  ModelRef,
+  ModelProtocolManifestResponse,
+  ModelTask,
+  ModelTrait,
+  ProviderConnectionResponse,
+  ProviderModelResponse,
+  ProviderResponse,
+} from './types';
+import { orderSelectorProviders, usableModelRefs } from './selectors';
 
-/** Managed free provider ranks LAST (the backend returns it first). */
-export function orderProviders(providers: readonly ProviderResponse[]): ProviderResponse[] {
+/**
+ * Management lists can use the persisted provider sort order. Runtime
+ * selectors, however, must preserve the API order within the supplier group
+ * just like desktop `orderModelSelectorProviders`.
+ */
+export function orderProviders(
+  providers: readonly ProviderResponse[],
+  mode: 'management' | 'selector' = 'management',
+): ProviderResponse[] {
+  if (mode === 'selector') return orderSelectorProviders(providers);
   return providers
     .map((provider, index) => ({ provider, index }))
     .sort((a, b) => {
-      const rank = Number(isManagedProvider(a.provider.platform)) - Number(isManagedProvider(b.provider.platform));
-      return rank || a.index - b.index;
+      const rank =
+        Number(isManagedProvider(a.provider.platform)) -
+        Number(isManagedProvider(b.provider.platform));
+      if (rank) return rank;
+      return a.provider.sort_order - b.provider.sort_order || a.index - b.index;
     })
     .map((entry) => entry.provider);
 }
 
-export function useProviders() {
+export function useProviders(mode: 'management' | 'selector' = 'management') {
   const { data, error, isLoading, mutate } = useSWR<ProviderResponse[]>(PROVIDERS_KEY);
-  const refresh = useCallback(() => {
-    void mutate();
-  }, [mutate]);
+  const refresh = useCallback(() => mutate(), [mutate]);
   useWsTopic('ws.reconnected', refresh);
 
   return {
-    providers: data ? orderProviders(data) : undefined,
+    providers: data ? orderProviders(data, mode) : undefined,
     error: error as Error | undefined,
     isLoading,
     refresh,
@@ -56,9 +72,8 @@ export function useProviders() {
 export function useProvider(providerId: string) {
   const { providers, error, isLoading, refresh, mutate } = useProviders();
   return {
-    provider: providers?.find((p) => p.provider_id === providerId),
-    /** True only when the list loaded and the id is genuinely absent. */
-    missing: !!providers && !providers.some((p) => p.provider_id === providerId),
+    provider: providers?.find((provider) => provider.provider_id === providerId),
+    missing: !!providers && !providers.some((provider) => provider.provider_id === providerId),
     error,
     isLoading,
     refresh,
@@ -66,20 +81,17 @@ export function useProvider(providerId: string) {
   };
 }
 
-/**
- * The management view reads `provider-models` (not `resolve`) on purpose: it
- * must show DISABLED rows, otherwise its own toggle would hide a model forever.
- */
+/** Management endpoint: disabled rows must remain visible in this hook. */
 export function useProviderModels(providerId: string) {
   const key = providerId ? providerModelsKey(providerId) : null;
   const { data, error, isLoading, mutate } = useSWR<ProviderModelResponse[]>(key);
-  const refresh = useCallback(() => {
-    void mutate();
-  }, [mutate]);
+  const refresh = useCallback(() => mutate(), [mutate]);
   useWsTopic('ws.reconnected', refresh);
 
   const models = data
-    ? [...data].sort((a, b) => a.sort_order - b.sort_order || a.model.localeCompare(b.model))
+    ? [...data].sort(
+        (a, b) => a.sort_order - b.sort_order || a.model.localeCompare(b.model),
+      )
     : undefined;
 
   return { models, error: error as Error | undefined, isLoading, refresh, mutate };
@@ -87,33 +99,100 @@ export function useProviderModels(providerId: string) {
 
 export function useClientDefaults() {
   const { data, error, isLoading, mutate } = useSWR<Record<string, unknown>>(CLIENT_SETTINGS_KEY);
-  const refresh = useCallback(() => {
-    void mutate();
-  }, [mutate]);
+  const refresh = useCallback(() => mutate(), [mutate]);
   useWsTopic('ws.reconnected', refresh);
 
   const defaults: ClientDefaults | undefined = data ? pickClientDefaults(data) : undefined;
   return { defaults, error: error as Error | undefined, isLoading, refresh, mutate };
 }
 
-/** Candidates for a task, straight from the resolver (enabled rows only). */
-export function useTaskModels(task: ModelTask, enabled = true) {
-  const { data, error, isLoading, mutate } = useSWR(
-    enabled ? resolveKey(task) : null,
-    () => resolveModelsForTask(task),
-  );
-  const refresh = useCallback(() => {
-    void mutate();
-  }, [mutate]);
-  useWsTopic('ws.reconnected', refresh);
+/**
+ * Derive exact task candidates locally from the canonical nested response.
+ * A failed provider request is explicitly represented by `unresolved`, never
+ * as an authoritative empty list.
+ */
+export function useTaskModels(
+  task: ModelTask,
+  enabled = true,
+  requiredTraits: readonly ModelTrait[] = [],
+) {
+  const providers = useProviders('selector');
+  const candidates = useMemo<ModelRef[] | undefined>(() => {
+    if (!providers.providers) return undefined;
+    if (!enabled) return [];
 
-  const candidates: ModelRef[] | undefined = data?.models;
+    return usableModelRefs(providers.providers, task, requiredTraits);
+  }, [enabled, providers.providers, requiredTraits, task]);
+
   return {
     candidates,
-    /** Catalog could not be read — do NOT treat as "no models". */
-    unresolved: !!error && !data,
+    unresolved: !!providers.error && !providers.providers,
+    error: providers.error,
+    isLoading: providers.isLoading,
+    refresh: providers.refresh,
+  };
+}
+
+export function useProviderConnections(providerId: string, enabled = true) {
+  const key = enabled && providerId ? providerConnectionsKey(providerId) : null;
+  const { data, error, isLoading, mutate } = useSWR<ProviderConnectionResponse[]>(
+    key,
+    key ? () => listProviderConnections(providerId) : null,
+    { revalidateOnFocus: false },
+  );
+  const refresh = useCallback(() => mutate(), [mutate]);
+  useWsTopic('ws.reconnected', refresh);
+  return {
+    connections: data ?? [],
     error: error as Error | undefined,
     isLoading,
     refresh,
+    mutate,
+  };
+}
+
+export function useModelProtocolManifests(
+  preset: string | undefined,
+  tasks: readonly ModelTask[],
+  baseUrl?: string,
+) {
+  const requestedTasks = useMemo(
+    () => [...new Set(tasks)],
+    [tasks],
+  );
+  const key =
+    preset && requestedTasks.length > 0
+      ? ['model-protocol-manifests', preset, baseUrl ?? '', requestedTasks.join(',')]
+      : null;
+  const { data, error, isLoading, mutate } = useSWR<
+    Record<ModelTask, ModelProtocolManifestResponse>
+  >(
+    key,
+    async () => {
+      const settled = await Promise.allSettled(
+        requestedTasks.map((task) => fetchModelProtocolManifest(preset!, task, baseUrl)),
+      );
+      const manifests = {} as Record<ModelTask, ModelProtocolManifestResponse>;
+      settled.forEach((result, index) => {
+        if (result.status === 'fulfilled') manifests[requestedTasks[index]] = result.value;
+      });
+      return manifests;
+    },
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const loadingTasks =
+    isLoading && !data ? requestedTasks : [];
+  const errorTasks =
+    error || (data && requestedTasks.some((task) => !data[task]))
+      ? requestedTasks.filter((task) => !data?.[task])
+      : [];
+  return {
+    manifests: data ?? ({} as Partial<Record<ModelTask, ModelProtocolManifestResponse>>),
+    loadingTasks,
+    errorTasks,
+    error: error as Error | undefined,
+    isLoading,
+    refresh: () => mutate(),
+    mutate,
   };
 }

@@ -48,6 +48,7 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
   const { t: tc } = useTranslation('common');
   const options = useModelOptions(conversation, visible);
   const [saving, setSaving] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState('');
 
   const rows: Row[] = [];
   for (const group of options.groups) {
@@ -58,25 +59,26 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
   const choose = async (group: ModelGroup, model: string) => {
     if (!conversation || saving) return;
     if (isSameModel(options.current, { providerId: group.providerId, model })) {
-      onClose();
+      if (!saving) onClose();
       return;
     }
     const key = `${group.providerId}:${model}`;
     setSaving(key);
+    setInlineError('');
     try {
       await patchConversationModel(conversation.conversation_id, {
         providerId: group.providerId,
         model,
       });
       onChanged();
-      toast.success(t('model.switched', { model }));
       onClose();
+      toast.success(t('model.switched', { model }));
     } catch (error) {
-      toast.error(
-        t('model.switchFailed', {
-          message: error instanceof Error ? error.message : tc('feedback.requestFailed'),
-        }),
-      );
+      const message = t('model.switchFailed', {
+        message: error instanceof Error ? error.message : tc('feedback.requestFailed'),
+      });
+      setInlineError(message);
+      toast.error(message);
     } finally {
       setSaving(null);
     }
@@ -159,16 +161,27 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
     );
   };
 
+  const close = () => {
+    if (saving) return;
+    setInlineError('');
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={close}
       {...(Platform.OS === 'android' ? { statusBarTranslucent: true } : {})}
     >
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-        <Pressable accessibilityLabel={tc('actions.close')} style={styles.backdropFill} onPress={onClose} />
+        <Pressable
+          accessibilityLabel={tc('actions.close')}
+          disabled={!!saving}
+          style={styles.backdropFill}
+          onPress={close}
+        />
         <View
           style={[
             styles.sheet,
@@ -187,13 +200,20 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tc('actions.close')}
-              onPress={onClose}
+              disabled={!!saving}
+              {...a11yState({ disabled: !!saving })}
+              onPress={close}
               hitSlop={8}
-              style={styles.close}
+              style={[styles.close, { opacity: saving ? 0.45 : 1 }]}
             >
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
+          {inlineError ? (
+            <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>
+              {inlineError}
+            </Text>
+          ) : null}
           <View style={styles.body}>{body()}</View>
         </View>
       </View>
@@ -250,4 +270,5 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.xxl },
   emptyTitle: { fontSize: FontSize.md, fontWeight: '600' },
   emptyHint: { fontSize: FontSize.sm, textAlign: 'center', lineHeight: 20 },
+  error: { fontSize: FontSize.sm, lineHeight: 19, marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
 });

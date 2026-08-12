@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, TextField, toast } from '@/components/ui';
+import { Button, TextField } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { createProviderModel, fetchProviderModels } from '@/features/models/api';
+import { fetchProviderModels } from '@/features/models/api';
 import { Sheet } from '@/features/models/components/sheet';
 import { errorMessage } from '@/features/models/errors';
 import { platformHasNoModelsEndpoint } from '@/features/models/platforms';
 import type { ModelInfo } from '@/features/models/types';
+import { a11yState } from '@/utils/a11y';
+import { AddProviderModelEditor } from './add-provider-model-editor';
 
 const MAX_VISIBLE_MODELS = 40;
 
@@ -18,6 +20,10 @@ interface AddModelSheetProps {
   visible: boolean;
   providerId: string;
   platform: string;
+  /** Manifest lookup preset; runtime `platform` is kept separate. */
+  manifestPreset?: string;
+  providerBaseUrl?: string;
+  providerAuthScheme?: string;
   /** Model ids already in the catalog — shown as 已添加, not addable twice. */
   existing: string[];
   onClose: () => void;
@@ -25,7 +31,7 @@ interface AddModelSheetProps {
 }
 
 /**
- * Adds one catalog row at a time via `POST /api/provider-models`, never by
+ * Adds one catalog row at a time via the provider-models API, never by
  * PUTting the whole `models` array back onto the provider (that is the
  * read-modify-write race the desktop deliberately moved away from).
  */
@@ -33,6 +39,9 @@ export function AddModelSheet({
   visible,
   providerId,
   platform,
+  manifestPreset = platform,
+  providerBaseUrl = '',
+  providerAuthScheme = '',
   existing,
   onClose,
   onAdded,
@@ -45,48 +54,58 @@ export function AddModelSheet({
   const [query, setQuery] = useState('');
   const [manual, setManual] = useState('');
   const [fetching, setFetching] = useState(false);
-  const [busyModel, setBusyModel] = useState('');
   const [error, setError] = useState('');
   const [added, setAdded] = useState<string[]>([]);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<ModelInfo | undefined>();
+  const catalogRequestRef = useRef(0);
+
+  // Ignore a provider catalog response that finishes after the sheet closes.
+  // Without this guard it can hydrate the next draft when the sheet reopens.
+  useEffect(() => {
+    if (!visible) {
+      catalogRequestRef.current += 1;
+      setFetching(false);
+    }
+  }, [visible]);
 
   const close = () => {
+    catalogRequestRef.current += 1;
+    setFetching(false);
     setCatalog(null);
     setQuery('');
     setManual('');
     setError('');
     setAdded([]);
+    setSelectedSuggestion(undefined);
     onClose();
   };
 
   const loadCatalog = async () => {
+    if (!visible) return;
+    const requestId = ++catalogRequestRef.current;
     setFetching(true);
     setError('');
     try {
       const result = await fetchProviderModels(providerId);
+      if (requestId !== catalogRequestRef.current || !visible) return;
       setCatalog(result.models);
       if (result.models.length === 0) setError(t('models.fetchFailed'));
     } catch (err) {
-      setError(errorMessage(err, t('models.fetchFailed')));
+      if (requestId === catalogRequestRef.current && visible) {
+        setError(errorMessage(err, t('models.fetchFailed')));
+      }
     } finally {
-      setFetching(false);
+      if (requestId === catalogRequestRef.current) setFetching(false);
     }
   };
 
-  const add = async (model: string) => {
-    const id = model.trim();
+  const add = (model: string | ModelInfo) => {
+    const id = (typeof model === 'string' ? model : model.id).trim();
     if (!id) return;
-    setBusyModel(id);
-    setError('');
-    try {
-      await createProviderModel(providerId, id);
-      setAdded((prev) => [...prev, id]);
-      toast.success(t('models.added', { model: id }));
-      onAdded();
-    } catch (err) {
-      setError(t('models.addFailed', { message: errorMessage(err, tc('feedback.requestFailed')) }));
-    } finally {
-      setBusyModel('');
-    }
+    setManual(id);
+    setSelectedSuggestion(typeof model === 'string' ? undefined : model);
+    setEditorOpen(true);
   };
 
   const known = new Set([...existing, ...added]);
@@ -96,98 +115,132 @@ export function AddModelSheet({
   const visibleModels = filtered.slice(0, MAX_VISIBLE_MODELS);
 
   return (
-    <Sheet
-      visible={visible}
-      title={t('models.add')}
-      onClose={close}
-      footer={
-        <Button variant="secondary" onPress={close}>
-          {tc('actions.done')}
-        </Button>
-      }
-    >
-      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('models.addManual')}</Text>
-      <View style={styles.manualRow}>
-        <View style={styles.manualField}>
-          <TextField
-            value={manual}
-            onChangeText={setManual}
-            placeholder={t('models.modelId')}
-            autoComplete="off"
-            onSubmitEditing={() => void add(manual)}
-          />
+    <>
+      <Sheet
+        // The editor owns a second Sheet. Keep the two Modal instances mutually
+        // exclusive so native platforms never render nested Modal containers.
+        visible={visible && !editorOpen}
+        title={t('models.add')}
+        onClose={close}
+        footer={
+          <Button variant="secondary" onPress={close}>
+            {tc('actions.done')}
+          </Button>
+        }
+      >
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          {t('models.addManual')}
+        </Text>
+        <View style={styles.manualRow}>
+          <View style={styles.manualField}>
+            <TextField
+              value={manual}
+              onChangeText={(value) => {
+                setManual(value);
+                setSelectedSuggestion(undefined);
+              }}
+              placeholder={t('models.modelId')}
+              autoComplete="off"
+              onSubmitEditing={() => void add(manual)}
+            />
+          </View>
+          <Button small onPress={() => void add(manual)} disabled={!manual.trim()}>
+            {tc('actions.create')}
+          </Button>
         </View>
-        <Button
-          small
-          onPress={() => void add(manual)}
-          disabled={!manual.trim()}
-          loading={busyModel === manual.trim() && !!manual.trim()}
-        >
-          {tc('actions.create')}
+
+        <View style={styles.spacer} />
+        <Button variant="secondary" onPress={() => void loadCatalog()} loading={fetching}>
+          {fetching ? t('models.fetching') : t('models.fetchFromUpstream')}
         </Button>
-      </View>
+        {platformHasNoModelsEndpoint(platform) ? (
+          <Text style={[styles.hint, { color: colors.warning }]}>{t('test.skipHint')}</Text>
+        ) : null}
+        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
-      <View style={styles.spacer} />
-      <Button variant="secondary" onPress={() => void loadCatalog()} loading={fetching}>
-        {fetching ? t('models.fetching') : t('models.fetchFromUpstream')}
-      </Button>
-      {platformHasNoModelsEndpoint(platform) ? (
-        <Text style={[styles.hint, { color: colors.warning }]}>{t('test.skipHint')}</Text>
-      ) : null}
-      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
-
-      {catalog ? (
-        <>
-          <View style={styles.spacer} />
-          <TextField
-            value={query}
-            onChangeText={setQuery}
-            placeholder={tc('actions.search')}
-            autoComplete="off"
-          />
-          {visibleModels.map((item) => {
-            const isKnown = known.has(item.id);
-            return (
-              <Pressable
-                key={item.id}
-                accessibilityRole="button"
-                disabled={isKnown || busyModel === item.id}
-                onPress={() => void add(item.id)}
-                style={({ pressed }) => [
-                  styles.modelRow,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-                    opacity: isKnown ? 0.55 : 1,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={isKnown ? 'checkmark-circle' : 'add-circle-outline'}
-                  size={20}
-                  color={isKnown ? colors.success : colors.primary}
-                />
-                <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
-                  {item.id}
-                </Text>
-                {isKnown ? (
-                  <Text style={[styles.hint, { color: colors.textTertiary }]}>
-                    {t('models.alreadyAdded')}
+        {catalog ? (
+          <>
+            <View style={styles.spacer} />
+            <TextField
+              value={query}
+              onChangeText={setQuery}
+              placeholder={tc('actions.search')}
+              autoComplete="off"
+            />
+            {visibleModels.map((item) => {
+              const isKnown = known.has(item.id);
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="button"
+                  disabled={isKnown}
+                  {...a11yState({ disabled: isKnown })}
+                  onPress={() => add(item)}
+                  style={({ pressed }) => [
+                    styles.modelRow,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                      opacity: isKnown ? 0.55 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={isKnown ? 'checkmark-circle' : 'add-circle-outline'}
+                    size={20}
+                    color={isKnown ? colors.success : colors.primary}
+                  />
+                  <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
+                    {item.id}
                   </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-          {filtered.length > visibleModels.length ? (
-            <Text style={[styles.hint, { color: colors.textTertiary }]}>
-              {t('add.moreModels', { count: filtered.length - visibleModels.length })}
-            </Text>
-          ) : null}
-        </>
-      ) : (
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('models.emptyHint')}</Text>
-      )}
-    </Sheet>
+                  {isKnown ? (
+                    <Text style={[styles.hint, { color: colors.textTertiary }]}>
+                      {t('models.alreadyAdded')}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            {filtered.length > visibleModels.length ? (
+              <Text style={[styles.hint, { color: colors.textTertiary }]}>
+                {t('add.moreModels', { count: filtered.length - visibleModels.length })}
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={[styles.hint, { color: colors.textTertiary }]}>
+            {t('models.emptyHint')}
+          </Text>
+        )}
+      </Sheet>
+
+      <AddProviderModelEditor
+        visible={visible && editorOpen}
+        providerId={providerId}
+        providerPreset={manifestPreset}
+        providerBaseUrl={providerBaseUrl}
+        providerAuthScheme={providerAuthScheme}
+        modelId={manual.trim()}
+        catalogSuggestion={
+          selectedSuggestion
+            ? {
+                model: selectedSuggestion.id,
+                label: selectedSuggestion.name ?? selectedSuggestion.id,
+                tasks: selectedSuggestion.tasks ?? [],
+                traits: selectedSuggestion.traits ?? [],
+              }
+            : undefined
+        }
+        existingModelIds={[...existing, ...added]}
+        onClose={() => setEditorOpen(false)}
+        onSaved={(id) => {
+          setAdded((prev) => (prev.includes(id) ? prev : [...prev, id]));
+          setEditorOpen(false);
+          setManual('');
+          onAdded();
+        }}
+      />
+    </>
   );
 }
 

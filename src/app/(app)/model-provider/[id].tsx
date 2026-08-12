@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useSWRConfig } from 'swr';
 
+import { ApiError } from '@/api/types';
 import {
   Button,
   Card,
@@ -13,15 +13,14 @@ import {
   Screen,
   SectionTitle,
   Tag,
-  TextField,
   toast,
 } from '@/components/ui';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  cloneProvider,
   deleteProvider,
   deleteProviderModel,
-  detectProtocol,
   providerHealthCheck,
   setProviderModelEnabled,
   updateProvider,
@@ -29,30 +28,34 @@ import {
 import { AddModelSheet } from '@/features/models/components/add-model-sheet';
 import { ModelRow } from '@/features/models/components/model-row';
 import { ModelTasksSheet } from '@/features/models/components/model-tasks-sheet';
+import { ProviderConnectionsSection } from '@/features/models/components/provider-connections-section';
+import { ProviderEditSheet } from '@/features/models/components/provider-edit-sheet';
 import { confirmDestructive } from '@/features/models/confirm';
 import { errorMessage, isProviderInUse } from '@/features/models/errors';
 import { useProvider, useProviderModels } from '@/features/models/hooks';
 import {
-  apiKeyCount,
-  isHttpUrl,
   isManagedProvider,
+  manifestPresetForProvider,
   platformHasNoModelsEndpoint,
 } from '@/features/models/platforms';
-import { MODEL_TASK_ORDER, type ProtocolDetectionResponse, type ProviderModelResponse } from '@/features/models/types';
+import type { ModelTask, ProviderModelResponse } from '@/features/models/types';
 
-/** Primary task for a heartbeat probe, in the desktop's display order. */
-function primaryTask(row: ProviderModelResponse) {
-  return MODEL_TASK_ORDER.find((task) => row.tasks.includes(task));
-}
-
-/** 供应商详情：凭证、连通性、模型目录。 */
+/**
+ * Provider detail is the mobile counterpart of the desktop model manager's
+ * provider card. All model writes use complete canonical rows:
+ *
+ *   provider -> models[] -> capabilities[]
+ *
+ * No response ever contains a secret, so this screen only displays the
+ * `has_credentials` marker and delegates write-only credential entry to the
+ * provider editor/connection sheets.
+ */
 export default function ProviderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const providerId = id ?? '';
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
-  const { mutate: globalMutate } = useSWRConfig();
 
   const { provider, missing, error, isLoading, mutate } = useProvider(providerId);
   const {
@@ -63,29 +66,40 @@ export default function ProviderDetailScreen() {
   } = useProviderModels(providerId);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [keyDraft, setKeyDraft] = useState('');
-  const [revealKey, setRevealKey] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [providerEditorOpen, setProviderEditorOpen] = useState(false);
   const [togglingProvider, setTogglingProvider] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [detection, setDetection] = useState<ProtocolDetectionResponse | null>(null);
-  const [testError, setTestError] = useState('');
+  const [cloning, setCloning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [providerActionError, setProviderActionError] = useState('');
   const [busyModel, setBusyModel] = useState('');
   const [checkingModel, setCheckingModel] = useState('');
+  const [checkingTask, setCheckingTask] = useState<ModelTask | null>(null);
+  const [modelActionError, setModelActionError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [tasksRow, setTasksRow] = useState<ProviderModelResponse | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const managed = !!provider && isManagedProvider(provider.platform);
+  const manifestPreset = provider
+    ? manifestPresetForProvider({
+        platform: provider.platform,
+        base_url: provider.base_url,
+      })
+    : '';
   const displayName = provider
     ? managed
       ? t('list.managedName')
       : provider.name || provider.platform
     : t('title');
+
+  /**
+   * The dedicated model endpoint is authoritative when it has loaded. During
+   * the first render, the nested provider projection gives the page useful
+   * content without waiting for a second request.
+   */
+  const rows = useMemo(
+    () => models ?? provider?.models ?? [],
+    [models, provider?.models],
+  );
 
   const refreshAll = async () => {
     setRefreshing(true);
@@ -96,99 +110,47 @@ export default function ProviderDetailScreen() {
     }
   };
 
-  const startEdit = () => {
-    if (!provider) return;
-    setName(provider.name);
-    setBaseUrl(provider.base_url);
-    setKeyDraft('');
-    setRevealKey(false);
-    setFormError('');
-    setEditing(true);
-  };
-
-  const save = async () => {
-    if (!provider) return;
-    if (!name.trim()) {
-      setFormError(t('provider.nameRequired'));
-      return;
-    }
-    if (!isHttpUrl(baseUrl)) {
-      setFormError(t('provider.baseUrlInvalid'));
-      return;
-    }
-    const patch: { name?: string; base_url?: string; api_key?: string } = {};
-    if (name.trim() !== provider.name) patch.name = name.trim();
-    if (baseUrl.trim() !== provider.base_url) patch.base_url = baseUrl.trim();
-    // Empty draft = keep the stored credential untouched.
-    if (keyDraft.trim()) patch.api_key = keyDraft.trim();
-    if (Object.keys(patch).length === 0) {
-      setEditing(false);
-      return;
-    }
-    setSaving(true);
-    setFormError('');
-    try {
-      await updateProvider(provider.provider_id, patch);
-      await mutate();
-      toast.success(tc('feedback.saved'));
-      setEditing(false);
-      setKeyDraft('');
-      setRevealKey(false);
-    } catch (err) {
-      setFormError(t('provider.saveFailed', { message: errorMessage(err, tc('feedback.requestFailed')) }));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const toggleProvider = async (next: boolean) => {
-    if (!provider) return;
+    if (!provider || managed || togglingProvider) return;
     setTogglingProvider(true);
+    setProviderActionError('');
+    await mutate(
+      (current) =>
+        current
+          ? current.map((item) =>
+              item.provider_id === provider.provider_id
+                ? { ...item, enabled: next }
+                : item,
+            )
+          : current,
+      { revalidate: false },
+    );
     try {
       await updateProvider(provider.provider_id, { enabled: next });
-      await mutate();
-    } catch (err) {
-      toast.error(errorMessage(err, tc('feedback.requestFailed')));
+    } catch (reason) {
+      setProviderActionError(errorMessage(reason, tc('feedback.requestFailed')));
       void mutate();
     } finally {
       setTogglingProvider(false);
-    }
-  };
-
-  const runTest = async () => {
-    if (!provider) return;
-    const keyToTest = keyDraft.trim() || provider.api_key;
-    if (!keyToTest) {
-      setTestError(t('add.keyRequired'));
-      return;
-    }
-    setTesting(true);
-    setTestError('');
-    setDetection(null);
-    try {
-      const result = await detectProtocol({
-        base_url: (editing ? baseUrl : provider.base_url).trim(),
-        api_key: keyToTest,
-        test_all_keys: apiKeyCount(keyToTest) > 1,
-      });
-      setDetection(result);
-    } catch (err) {
-      setTestError(errorMessage(err, t('test.failed')));
-    } finally {
-      setTesting(false);
+      void mutate();
     }
   };
 
   const toggleModel = async (row: ProviderModelResponse, next: boolean) => {
+    if (busyModel) return;
     setBusyModel(row.model);
+    setModelActionError('');
     await mutateModels(
-      (list) => list?.map((item) => (item.model === row.model ? { ...item, enabled: next } : item)),
+      (current) =>
+        current?.map((item) =>
+          item.model === row.model ? { ...item, enabled: next } : item,
+        ),
       { revalidate: false },
     );
     try {
-      await setProviderModelEnabled(row.provider_id, row.model, next);
-    } catch (err) {
-      toast.error(errorMessage(err, tc('feedback.requestFailed')));
+      await setProviderModelEnabled(row.provider_id, row, next);
+    } catch (reason) {
+      setModelActionError(errorMessage(reason, tc('feedback.requestFailed')));
     } finally {
       setBusyModel('');
       void mutateModels();
@@ -196,20 +158,27 @@ export default function ProviderDetailScreen() {
     }
   };
 
-  const heartbeat = async (row: ProviderModelResponse) => {
+  const heartbeat = async (row: ProviderModelResponse, task: ModelTask) => {
+    if (checkingModel) return;
     setCheckingModel(row.model);
+    setCheckingTask(task);
+    setModelActionError('');
     try {
-      const result = await providerHealthCheck(row.provider_id, row.model, primaryTask(row));
+      const result = await providerHealthCheck(row.provider_id, row.model, task);
       if (result.status === 'healthy') {
         toast.success(t('models.healthy', { latency: result.elapsed_ms }));
       } else {
-        toast.error(result.message || t('models.unhealthy'));
+        setModelActionError(result.message || t('models.unhealthy'));
       }
-    } catch (err) {
-      toast.error(t('models.checkFailed', { message: errorMessage(err, tc('feedback.requestFailed')) }));
+    } catch (reason) {
+      setModelActionError(
+        t('models.checkFailed', {
+          message: errorMessage(reason, tc('feedback.requestFailed')),
+        }),
+      );
     } finally {
       setCheckingModel('');
-      // The probe persists health on the row — refetch, never merge locally.
+      setCheckingTask(null);
       void mutateModels();
       void mutate();
     }
@@ -224,11 +193,12 @@ export default function ProviderDetailScreen() {
       onConfirm: () => {
         void (async () => {
           setBusyModel(row.model);
+          setModelActionError('');
           try {
             await deleteProviderModel(row.provider_id, row.model);
             toast.success(tc('feedback.deleted'));
-          } catch (err) {
-            toast.error(errorMessage(err, tc('feedback.requestFailed')));
+          } catch (reason) {
+            setModelActionError(errorMessage(reason, tc('feedback.requestFailed')));
           } finally {
             setBusyModel('');
             void mutateModels();
@@ -240,28 +210,49 @@ export default function ProviderDetailScreen() {
   };
 
   const removeProvider = () => {
-    if (!provider) return;
+    if (!provider || managed) return;
     confirmDestructive({
       title: t('provider.delete'),
-      message: `${t('provider.deleteConfirm', { name: displayName })}\n${tc('confirm.irreversible')}`,
+      message: `${t('provider.deleteConfirm', { name: displayName })}\n${tc(
+        'confirm.irreversible',
+      )}`,
       confirmLabel: tc('actions.delete'),
       cancelLabel: tc('actions.cancel'),
       onConfirm: () => {
         void (async () => {
           setDeleting(true);
+          setProviderActionError('');
           try {
             await deleteProvider(provider.provider_id);
-            await mutate();
             toast.success(tc('feedback.deleted'));
-            router.back();
-          } catch (err) {
-            toast.error(isProviderInUse(err) ? t('provider.inUse') : errorMessage(err, tc('feedback.requestFailed')));
+            router.canGoBack() ? router.back() : router.replace('/models');
+          } catch (reason) {
+            setProviderActionError(
+              isProviderInUse(reason)
+                ? t('provider.inUse')
+                : errorMessage(reason, tc('feedback.requestFailed')),
+            );
           } finally {
             setDeleting(false);
           }
         })();
       },
     });
+  };
+
+  const duplicateProvider = async () => {
+    if (!provider || managed || cloning) return;
+    setCloning(true);
+    setProviderActionError('');
+    try {
+      await cloneProvider(provider.provider_id, `${displayName} ${t('provider.copySuffix')}`);
+      toast.success(t('provider.cloned'));
+      void mutate();
+    } catch (reason) {
+      setProviderActionError(errorMessage(reason, tc('feedback.requestFailed')));
+    } finally {
+      setCloning(false);
+    }
   };
 
   const header = <Stack.Screen options={{ title: displayName }} />;
@@ -276,11 +267,12 @@ export default function ProviderDetailScreen() {
   }
 
   if (error && !provider) {
+    const forbidden = error instanceof ApiError && error.status === 403;
     return (
       <Screen scroll={false}>
         {header}
         <ErrorState
-          message={`${t('list.loadFailed')}\n${error.message}`}
+          message={forbidden ? t('list.ownerOnly') : `${t('list.loadFailed')}\n${error.message}`}
           onRetry={() => void mutate()}
           retryLabel={tc('actions.retry')}
         />
@@ -296,14 +288,15 @@ export default function ProviderDetailScreen() {
           icon="help-circle-outline"
           title={t('provider.notFound')}
           description={missing ? t('provider.notFoundHint') : undefined}
-          action={<Button variant="secondary" onPress={() => router.back()}>{tc('actions.back')}</Button>}
+          action={
+            <Button variant="secondary" onPress={() => router.back()}>
+              {tc('actions.back')}
+            </Button>
+          }
         />
       </Screen>
     );
   }
-
-  const keyCount = apiKeyCount(provider.api_key);
-  const rows = models ?? [];
 
   return (
     <Screen refreshing={refreshing} onRefresh={() => void refreshAll()}>
@@ -311,40 +304,69 @@ export default function ProviderDetailScreen() {
 
       <Card>
         <View style={styles.metaRow}>
-          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>{t('provider.platform')}</Text>
+          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>
+            {t('provider.platform')}
+          </Text>
           <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={1}>
             {provider.platform}
           </Text>
         </View>
         <View style={styles.metaRow}>
-          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>{t('provider.baseUrl')}</Text>
+          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>
+            {t('provider.name')}
+          </Text>
           <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={2}>
-            {provider.base_url || '—'}
+            {provider.name || provider.platform}
           </Text>
         </View>
         <View style={styles.metaRow}>
-          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>{t('provider.apiKey')}</Text>
-          <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={1}>
-            {keyCount > 0 ? t('provider.apiKeyMasked', { count: keyCount }) : t('provider.apiKeyEmpty')}
+          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>
+            {t('provider.baseUrl')}
           </Text>
+          <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={2}>
+            {provider.base_url || t('provider.notApplicable')}
+          </Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>
+            {t('provider.authScheme')}
+          </Text>
+          <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={2}>
+            {provider.auth_scheme || t('provider.notConfigured')}
+          </Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>
+            {t('provider.credentials')}
+          </Text>
+          <Tag tone={provider.has_credentials ? 'success' : 'warning'}>
+            {provider.has_credentials
+              ? t('list.credentialsConfigured')
+              : t('list.credentialsMissing')}
+          </Tag>
         </View>
 
         {managed ? (
           <View style={styles.managedRow}>
             <Tag tone="primary">{t('list.managed')}</Tag>
-            <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('list.managedHint')}</Text>
+            <Text style={[styles.hint, { color: colors.textTertiary }]}>
+              {t('list.managedHint')}
+            </Text>
           </View>
         ) : (
           <>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.switchRow}>
               <View style={styles.switchText}>
-                <Text style={[styles.metaValue, { color: colors.text }]}>{t('provider.enabled')}</Text>
+                <Text style={[styles.metaValue, { color: colors.text }]}>
+                  {t('provider.enabled')}
+                </Text>
                 <Text style={[styles.hint, { color: colors.textTertiary }]}>
                   {t('provider.enabledHint')}
                 </Text>
               </View>
               <Switch
+                accessibilityLabel={t('provider.enabled')}
                 value={provider.enabled}
                 disabled={togglingProvider}
                 onValueChange={(next) => void toggleProvider(next)}
@@ -353,140 +375,64 @@ export default function ProviderDetailScreen() {
             </View>
           </>
         )}
+
+        {providerActionError ? (
+          <Text style={[styles.error, { color: colors.danger }]}>
+            {providerActionError}
+          </Text>
+        ) : null}
+
+        {!managed ? (
+          <View style={styles.buttonRow}>
+            <View style={styles.buttonFlex}>
+              <Button
+                variant="secondary"
+                onPress={() => setProviderEditorOpen(true)}
+                disabled={cloning || deleting}
+              >
+                {t('provider.edit')}
+              </Button>
+            </View>
+            <View style={styles.buttonFlex}>
+              <Button
+                variant="secondary"
+                onPress={() => void duplicateProvider()}
+                loading={cloning}
+                disabled={deleting}
+              >
+                {t('provider.clone')}
+              </Button>
+            </View>
+          </View>
+        ) : null}
       </Card>
 
-      {managed ? null : (
-        <>
-          <SectionTitle>{t('provider.credentials')}</SectionTitle>
-          <Card>
-            {editing ? (
-              <>
-                <TextField label={t('provider.name')} value={name} onChangeText={setName} />
-                <TextField
-                  label={t('provider.baseUrl')}
-                  value={baseUrl}
-                  onChangeText={setBaseUrl}
-                  keyboardType="url"
-                  autoComplete="off"
-                />
-                <TextField
-                  label={t('provider.apiKey')}
-                  value={keyDraft}
-                  onChangeText={setKeyDraft}
-                  placeholder={
-                    keyCount > 0 ? t('provider.apiKeyMasked', { count: keyCount }) : t('provider.apiKeyPlaceholder')
-                  }
-                  secureTextEntry={!revealKey}
-                  multiline={revealKey}
-                  autoComplete="off"
-                  hint={t('provider.apiKeyEditHint')}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={() => {
-                    // Reveal is explicit and opt-in: keys are never rendered by default.
-                    if (revealKey) {
-                      setRevealKey(false);
-                      return;
-                    }
-                    setKeyDraft(keyDraft || provider.api_key);
-                    setRevealKey(true);
-                  }}
-                >
-                  <Text style={[styles.link, { color: colors.primary }]}>
-                    {revealKey ? t('provider.hide') : t('provider.reveal')}
-                  </Text>
-                </Pressable>
-                {formError ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>{formError}</Text>
-                ) : null}
-                <View style={styles.buttonRow}>
-                  <View style={styles.buttonFlex}>
-                    <Button variant="secondary" onPress={() => setEditing(false)} disabled={saving}>
-                      {tc('actions.cancel')}
-                    </Button>
-                  </View>
-                  <View style={styles.buttonFlex}>
-                    <Button onPress={() => void save()} loading={saving}>
-                      {tc('actions.save')}
-                    </Button>
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.hint, { color: colors.textTertiary }]}>
-                  {t('provider.credentialsHint')}
-                </Text>
-                <View style={styles.buttonRow}>
-                  <View style={styles.buttonFlex}>
-                    <Button variant="secondary" onPress={startEdit}>
-                      {tc('actions.edit')}
-                    </Button>
-                  </View>
-                  <View style={styles.buttonFlex}>
-                    <Button variant="secondary" onPress={() => void runTest()} loading={testing}>
-                      {testing ? t('test.testing') : t('test.action')}
-                    </Button>
-                  </View>
-                </View>
-              </>
-            )}
+      {!managed ? (
+        <ProviderConnectionsSection
+          providerId={provider.provider_id}
+          platform={provider.platform}
+        />
+      ) : null}
 
-            {platformHasNoModelsEndpoint(provider.platform) ? (
-              <Text style={[styles.hint, { color: colors.warning }]}>{t('test.skipHint')}</Text>
-            ) : null}
-            {detection ? (
-              <View style={[styles.result, { borderColor: colors.border }]}>
-                <Text
-                  style={[
-                    styles.resultTitle,
-                    { color: detection.success ? colors.success : colors.danger },
-                  ]}
-                >
-                  {detection.success
-                    ? t('test.success', { protocol: detection.protocol })
-                    : t('test.failed')}
-                </Text>
-                {detection.multi_key_result ? (
-                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                    {t('test.keys', {
-                      valid: detection.multi_key_result.valid,
-                      total: detection.multi_key_result.total,
-                    })}
-                  </Text>
-                ) : null}
-                {detection.suggestion && detection.suggestion.type !== 'none' ? (
-                  <Text style={[styles.hint, { color: colors.warning }]}>
-                    {detection.suggestion.message}
-                  </Text>
-                ) : null}
-                {detection.fixed_base_url ? (
-                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
-                    {t('test.fixedBaseUrl', { url: detection.fixed_base_url })}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-            {testError ? <Text style={[styles.error, { color: colors.danger }]}>{testError}</Text> : null}
-          </Card>
-        </>
-      )}
+      <SectionTitle>
+        {`${t('models.title')} · ${t('models.count', { count: rows.length })}`}
+      </SectionTitle>
 
-      <SectionTitle>{`${t('models.title')} · ${t('models.count', { count: rows.length })}`}</SectionTitle>
-
-      {modelsLoading && !models ? <Loading label={tc('state.loading')} /> : null}
-
-      {modelsError && !models ? (
+      {modelsLoading && !models && rows.length === 0 ? (
+        <Loading label={tc('state.loading')} />
+      ) : null}
+      {modelsError && rows.length === 0 ? (
         <ErrorState
           message={`${t('models.loadFailed')}\n${modelsError.message}`}
           onRetry={() => void mutateModels()}
           retryLabel={tc('actions.retry')}
         />
       ) : null}
+      {modelActionError ? (
+        <Text style={[styles.error, { color: colors.danger }]}>{modelActionError}</Text>
+      ) : null}
 
-      {models && rows.length === 0 ? (
+      {rows.length === 0 && !modelsLoading ? (
         <EmptyState
           icon="cube-outline"
           title={t('models.empty')}
@@ -508,37 +454,43 @@ export default function ProviderDetailScreen() {
           providerDisabled={!provider.enabled}
           readOnly={managed}
           busy={busyModel === row.model}
-          checking={checkingModel === row.model}
+          checkingTask={checkingModel === row.model ? checkingTask : null}
           onToggle={(next) => void toggleModel(row, next)}
-          onHeartbeat={() => void heartbeat(row)}
-          onEditTasks={() => setTasksRow(row)}
+          onHeartbeat={(task) => void heartbeat(row, task)}
+          onEdit={() => setTasksRow(row)}
           onDelete={() => removeModel(row)}
         />
       ))}
 
-      {managed || rows.length === 0 ? null : (
+      {!managed ? (
         <>
-          <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('models.tagsDesktopHint')}</Text>
-          <View style={styles.action}>
-            <Button variant="secondary" onPress={() => setAddOpen(true)}>
-              {t('models.add')}
+          <Text style={[styles.hint, { color: colors.textTertiary }]}>
+            {platformHasNoModelsEndpoint(provider.platform)
+              ? t('models.noCatalogEndpointHint')
+              : t('models.mobileEditorHint')}
+          </Text>
+          {rows.length > 0 ? (
+            <View style={styles.action}>
+              <Button variant="secondary" onPress={() => setAddOpen(true)}>
+                {t('models.add')}
+              </Button>
+            </View>
+          ) : null}
+          <View style={styles.danger}>
+            <Button variant="danger" onPress={removeProvider} loading={deleting}>
+              {t('provider.delete')}
             </Button>
           </View>
         </>
-      )}
-
-      {managed ? null : (
-        <View style={styles.danger}>
-          <Button variant="danger" onPress={removeProvider} loading={deleting}>
-            {t('provider.delete')}
-          </Button>
-        </View>
-      )}
+      ) : null}
 
       <AddModelSheet
         visible={addOpen}
         providerId={provider.provider_id}
         platform={provider.platform}
+        manifestPreset={manifestPreset}
+        providerBaseUrl={provider.base_url}
+        providerAuthScheme={provider.auth_scheme}
         existing={rows.map((row) => row.model)}
         onClose={() => setAddOpen(false)}
         onAdded={() => {
@@ -550,20 +502,30 @@ export default function ProviderDetailScreen() {
       <ModelTasksSheet
         visible={tasksRow !== null}
         row={tasksRow}
+        providerPlatform={manifestPreset}
+        providerBaseUrl={provider.base_url}
+        providerAuthScheme={provider.auth_scheme}
+        existingModelIds={rows.map((row) => row.model)}
         onClose={() => setTasksRow(null)}
         onSaved={(updated) => {
-          // The response IS the new row: patch it in, then revalidate the
-          // provider (its models_detail carries the same tags) and every
-          // task resolver that may now include or exclude this model.
           void mutateModels(
-            (list) => list?.map((item) => (item.model === updated.model ? updated : item)),
+            (list) =>
+              list?.map((item) => (item.model === updated.model ? updated : item)),
             { revalidate: false },
           );
           void mutateModels();
           void mutate();
-          void globalMutate(
-            (key) => Array.isArray(key) && key[0] === '/api/model-profiles/resolve',
-          );
+        }}
+      />
+
+      <ProviderEditSheet
+        visible={providerEditorOpen}
+        provider={provider}
+        onClose={() => setProviderEditorOpen(false)}
+        onSaved={() => {
+          setProviderEditorOpen(false);
+          void mutate();
+          void mutateModels();
         }}
       />
     </Screen>
@@ -571,26 +533,27 @@ export default function ProviderDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  metaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, paddingVertical: 6 },
-  metaLabel: { fontSize: FontSize.sm, width: 84 },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    paddingVertical: 6,
+  },
+  metaLabel: { fontSize: FontSize.sm, width: 92 },
   metaValue: { flex: 1, fontSize: FontSize.sm, fontWeight: '600' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.sm },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, minHeight: 44 },
   switchText: { flex: 1, gap: 2 },
-  managedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
-  hint: { flex: 1, fontSize: FontSize.xs, lineHeight: 17 },
-  link: { fontSize: FontSize.sm, fontWeight: '600', paddingVertical: Spacing.xs },
-  error: { fontSize: FontSize.sm, lineHeight: 19, marginBottom: Spacing.sm },
-  buttonRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
-  buttonFlex: { flex: 1 },
-  result: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+  managedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
     marginTop: Spacing.sm,
-    gap: 4,
   },
-  resultTitle: { fontSize: FontSize.sm, fontWeight: '700' },
+  hint: { flex: 1, fontSize: FontSize.xs, lineHeight: 17 },
+  error: { fontSize: FontSize.sm, lineHeight: 19, marginTop: Spacing.sm },
+  buttonRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  buttonFlex: { flex: 1 },
   action: { marginTop: Spacing.md },
   danger: { marginTop: Spacing.xxl },
 });

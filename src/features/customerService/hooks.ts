@@ -13,6 +13,8 @@
 import { useCallback, useMemo } from 'react';
 import useSWR, { useSWRConfig, type SWRConfiguration } from 'swr';
 
+import { useProviders as useModelProviders } from '@/features/models/hooks';
+
 import * as csApi from './api';
 import { buildTaskModelGroups, mergeAgent, selectCsChannelBots } from './normalize';
 import type {
@@ -219,25 +221,43 @@ export interface ChatModelsResult {
 }
 
 /**
- * Chat-capable provider/model catalog: `POST /api/model-profiles/resolve`
- * joined against the enabled provider list. Provider order comes from the
- * provider list, model order from the catalog.
+ * Chat-capable provider/model catalog derived from the canonical nested
+ * provider response. Provider order comes from the provider list, model order
+ * from each provider's model rows.
  */
 export function useChatModels(): ChatModelsResult {
-  const providers = useSWR(csKeys.providers, csApi.listProviders, CATALOG_OPTIONS);
-  const catalog = useSWR(csKeys.chatModels, csApi.resolveChatModels, CATALOG_OPTIONS);
+  // Reuse the canonical provider graph/cache used by model management and
+  // session selectors. This prevents a model CRUD write from leaving the
+  // customer-service picker on a stale, separately normalized snapshot.
+  const providerGraph = useModelProviders('selector');
+  const providers = providerGraph.providers ?? [];
 
   const groups = useMemo(
-    () => buildTaskModelGroups(catalog.data ?? [], providers.data ?? []),
-    [catalog.data, providers.data],
+    () => buildTaskModelGroups(
+      providers.flatMap((provider) =>
+        (provider.models ?? [])
+          .filter(
+            (model) =>
+              provider.enabled === true &&
+              model.enabled === true &&
+              model.capabilities.some((capability) => capability.task === 'chat'),
+          )
+          .map((model) => ({
+            provider_id: provider.provider_id,
+            model: model.model,
+          })),
+      ),
+      providers,
+    ),
+    [providers],
   );
 
   const providerName = useCallback(
     (providerId: string | null) =>
       providerId == null
         ? undefined
-        : (providers.data ?? []).find((provider) => provider.provider_id === providerId)?.name,
-    [providers.data],
+        : providers.find((provider) => provider.provider_id === providerId)?.name,
+    [providers],
   );
 
   const modelsOf = useCallback(
@@ -249,15 +269,15 @@ export function useChatModels(): ChatModelsResult {
   );
 
   const refresh = useCallback(
-    () => Promise.all([providers.mutate(), catalog.mutate()]),
-    [catalog, providers],
+    () => providerGraph.refresh(),
+    [providerGraph],
   );
 
   return {
     groups,
     // Never treat a failed resolve as an authoritative empty catalog.
-    isLoading: providers.isLoading || catalog.isLoading,
-    error: errorOf(providers.error ?? catalog.error),
+    isLoading: providerGraph.isLoading || !providerGraph.providers,
+    error: errorOf(providerGraph.error),
     refresh,
     providerName,
     modelsOf,

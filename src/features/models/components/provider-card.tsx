@@ -1,12 +1,13 @@
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 import { Avatar, Tag } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { apiKeyCount, isManagedProvider } from '@/features/models/platforms';
+import { isManagedProvider } from '@/features/models/platforms';
 import type { ProviderResponse } from '@/features/models/types';
+import { a11yState } from '@/utils/a11y';
 
 interface ProviderCardProps {
   provider: ProviderResponse;
@@ -15,28 +16,25 @@ interface ProviderCardProps {
   onToggle: (enabled: boolean) => void;
 }
 
-/**
- * Provider summary card.
- *
- * The switch lives OUTSIDE the pressable body on purpose: under
- * react-native-web a click on a nested Switch also bubbles to the parent
- * Pressable, which would navigate away while toggling.
- */
 export function ProviderCard({ provider, busy, onPress, onToggle }: ProviderCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
-
   const managed = isManagedProvider(provider.platform);
-  const rows = provider.models_detail ?? [];
-  const modelCount = rows.length > 0 ? rows.length : provider.models.length;
-  const keyCount = apiKeyCount(provider.api_key);
-  const unhealthy = rows.filter((row) => row.health?.status === 'unhealthy').length;
+  const models = provider.models ?? [];
+  const unhealthy = models.reduce(
+    (count, model) =>
+      count +
+      model.capabilities.filter((capability) => capability.health?.status === 'unhealthy').length,
+    0,
+  );
   const displayName = managed ? t('list.managedName') : provider.name || provider.platform;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
+        disabled={!!busy}
+        {...a11yState({ disabled: !!busy })}
         onPress={onPress}
         style={({ pressed }) => [styles.body, { opacity: pressed ? 0.7 : 1 }]}
       >
@@ -46,8 +44,13 @@ export function ProviderCard({ provider, busy, onPress, onToggle }: ProviderCard
             {displayName}
           </Text>
           <Text style={[styles.meta, { color: colors.textTertiary }]} numberOfLines={1}>
-            {managed ? t('list.managed') : provider.platform} · {t('list.modelCount', { count: modelCount })}
-            {managed ? '' : ` · ${t('list.keyCount', { count: keyCount })}`}
+            {managed ? t('list.managed') : provider.platform} ·{' '}
+            {t('list.modelCount', { count: models.length })}
+            {!managed && provider.has_credentials
+              ? ` · ${t('list.credentialsConfigured')}`
+              : !managed
+                ? ` · ${t('list.credentialsMissing')}`
+                : ''}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
@@ -58,7 +61,9 @@ export function ProviderCard({ provider, busy, onPress, onToggle }: ProviderCard
           <Tag tone={provider.enabled ? 'success' : 'neutral'}>
             {provider.enabled ? t('provider.on') : t('provider.off')}
           </Tag>
-          {unhealthy > 0 ? <Tag tone="danger">{t('list.unhealthy', { count: unhealthy })}</Tag> : null}
+          {unhealthy > 0 ? (
+            <Tag tone="danger">{t('list.unhealthy', { count: unhealthy })}</Tag>
+          ) : null}
           {managed ? <Tag tone="primary">{t('list.managed')}</Tag> : null}
         </View>
         {managed ? (
@@ -67,8 +72,9 @@ export function ProviderCard({ provider, busy, onPress, onToggle }: ProviderCard
           </Text>
         ) : (
           <Switch
+            accessibilityLabel={t('provider.enabled')}
             value={provider.enabled}
-            disabled={busy}
+            disabled={!!busy}
             onValueChange={onToggle}
             trackColor={{ true: colors.primary, false: colors.border }}
           />

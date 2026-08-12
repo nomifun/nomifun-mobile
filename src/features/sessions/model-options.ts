@@ -28,7 +28,7 @@ export function useModelOptions(conversation: Conversation | undefined, enabled:
   const task = useTaskModels('chat', enabled);
   // `useProviders` has no enable switch; the key is shared with the models
   // screen so an already-cached list costs nothing here.
-  const providers = useProviders();
+  const providers = useProviders('selector');
   const current = currentModelRef(conversation);
 
   const groups = useMemo(

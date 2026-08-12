@@ -196,11 +196,35 @@ export function normalizeKnowledgeBase(raw: unknown): KnowledgeBaseSummary {
 
 export function normalizeProvider(raw: unknown): ProviderSummary {
   const provider = asWireObject(raw, 'provider');
+  const models = Array.isArray(provider.models)
+    ? provider.models.flatMap((rawModel) => {
+        if (!rawModel || typeof rawModel !== 'object') return [];
+        const model = rawModel as Record<string, unknown>;
+        const modelId = asText(model.model);
+        if (!modelId) return [];
+        const capabilities = Array.isArray(model.capabilities)
+          ? model.capabilities.flatMap((rawCapability) => {
+              if (!rawCapability || typeof rawCapability !== 'object') return [];
+              const task = asText((rawCapability as Record<string, unknown>).task);
+              return task ? [{ task }] : [];
+            })
+          : [];
+        return [
+          {
+            model: modelId,
+            enabled: asBool(model.enabled, true),
+            sort_order: asInt(model.sort_order, 0),
+            capabilities,
+          },
+        ];
+      })
+    : [];
   return {
     provider_id: requireId(provider.provider_id, 'provider_id'),
     name: asText(provider.name),
     platform: asText(provider.platform),
     enabled: asBool(provider.enabled, true),
+    models,
   };
 }
 

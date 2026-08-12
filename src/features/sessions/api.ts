@@ -10,6 +10,12 @@
  *   create; `undefined` values are dropped by JSON.stringify).
  */
 import { api } from '@/api/client';
+import { listProviders } from '@/features/models/api';
+import {
+  firstUsableModel,
+  isUsableModelRef,
+} from '@/features/models/selectors';
+import type { ModelRef } from '@/features/models/types';
 
 import {
   confirmBody,
@@ -191,11 +197,6 @@ export function fetchMessages(
   return api<Paginated<StoredMessage>>(messagesPath(conversationId, cursor, pageSize));
 }
 
-interface ModelRef {
-  provider_id: string;
-  model: string;
-}
-
 /**
  * The server does NOT fall back to the global default at send time — a Nomi
  * conversation created without a model rejects every message with
@@ -203,28 +204,31 @@ interface ModelRef {
  * client-side and stamp it into the create payload.
  */
 async function resolveDefaultChatModel(): Promise<ModelRef | undefined> {
+  let saved: ModelRef | undefined;
   try {
     const map = await api<Record<string, unknown>>('/api/settings/client');
-    const saved = map?.['nomi.defaultModel'];
-    if (saved && typeof saved === 'object') {
-      const { provider_id, model } = saved as Record<string, unknown>;
+    const raw = map?.['nomi.defaultModel'];
+    if (raw && typeof raw === 'object') {
+      const { provider_id, model } = raw as Record<string, unknown>;
       if (typeof provider_id === 'string' && provider_id && typeof model === 'string' && model) {
-        return { provider_id, model };
+        saved = { provider_id, model };
       }
     }
   } catch {
     // fall through to task resolution
   }
+
   try {
-    const resolved = await api<{ models?: ModelRef[] }>('/api/model-profiles/resolve', {
-      body: { task: 'chat' },
-    });
-    const first = resolved?.models?.find((m) => m.provider_id && m.model);
-    if (first) return { provider_id: first.provider_id, model: first.model };
+    const providers = await listProviders();
+    // Do not stamp a disabled/deleted/non-chat reference into a new session.
+    // If it is still runnable, preserve the user's explicit default.
+    if (isUsableModelRef(providers, saved, 'chat')) return saved;
+    return firstUsableModel(providers, 'chat');
   } catch {
-    // no model available — create without one; sends will surface the server hint
+    // A transient catalog failure must not erase a valid saved reference. The
+    // server will still validate it when the first message is sent.
+    return saved;
   }
-  return undefined;
 }
 
 export interface CreateConversationOptions {

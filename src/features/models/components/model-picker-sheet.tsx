@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,11 +9,20 @@ import { useTheme } from '@/hooks/use-theme';
 import { Sheet } from '@/features/models/components/sheet';
 import { useTaskModels } from '@/features/models/hooks';
 import { isManagedProvider } from '@/features/models/platforms';
-import type { ModelRef, ModelTask, ProviderResponse } from '@/features/models/types';
+import { modelSupportsTask, orderSelectorProviders } from '@/features/models/selectors';
+import type {
+  ModelRef,
+  ModelTask,
+  ModelTrait,
+  ProviderResponse,
+} from '@/features/models/types';
+import { a11yState } from '@/utils/a11y';
 
 interface ModelPickerSheetProps {
   visible: boolean;
   task: ModelTask;
+  /** Optional capability traits required by the caller (e.g. vision input). */
+  requiredTraits?: readonly ModelTrait[];
   title: string;
   current?: ModelRef;
   providers: readonly ProviderResponse[];
@@ -20,14 +30,17 @@ interface ModelPickerSheetProps {
   onClose: () => void;
   onSelect: (ref: ModelRef) => void;
   onClear: () => void;
+  children?: ReactNode;
+  footer?: ReactNode;
+  showClear?: boolean;
 }
 
 /**
  * The mobile equivalent of the desktop `TaskModelSelect`.
  *
- * Candidates come from `POST /api/model-profiles/resolve` (the authority for
- * every selector: enabled providers, enabled rows, stored profile wins with a
- * heuristic fallback). Two behaviours copied verbatim:
+ * Candidates are derived from the canonical nested provider catalog (the
+ * authority for every selector: enabled providers, enabled rows, and the
+ * exact task-scoped capability). Two behaviours copied verbatim:
  * - a stale saved reference is rendered explicitly as "（不可用）" with a
  *   warning, never silently blanked;
  * - "request errored, data undefined" means the catalog is UNRESOLVED, not
@@ -36,6 +49,7 @@ interface ModelPickerSheetProps {
 export function ModelPickerSheet({
   visible,
   task,
+  requiredTraits = [],
   title,
   current,
   providers,
@@ -43,11 +57,31 @@ export function ModelPickerSheet({
   onClose,
   onSelect,
   onClear,
+  children,
+  footer,
+  showClear = true,
 }: ModelPickerSheetProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
-  const { candidates, unresolved, isLoading, refresh } = useTaskModels(task, visible);
+  const { candidates, unresolved, isLoading, refresh } = useTaskModels(
+    task,
+    visible,
+    requiredTraits,
+  );
+  const localCandidates = orderSelectorProviders(providers).flatMap((provider) => {
+    if (provider.enabled === false) return [];
+    return provider.models
+      .filter(
+        (model) =>
+          model.enabled === true && modelSupportsTask(model, task, requiredTraits),
+      )
+      .map((model) => ({ provider_id: provider.provider_id, model: model.model }));
+  });
+  // The management page already owns a complete provider graph. Prefer that
+  // snapshot so an optimistic enable/disable immediately updates this sheet,
+  // while the SWR hook still supplies authoritative loading/error semantics.
+  const displayedCandidates = providers.length > 0 ? localCandidates : candidates;
 
   const providerLabel = (providerId: string): string => {
     const provider = providers.find((p) => p.provider_id === providerId);
@@ -57,7 +91,7 @@ export function ModelPickerSheet({
   };
 
   const groups = new Map<string, string[]>();
-  for (const ref of candidates ?? []) {
+  for (const ref of displayedCandidates ?? []) {
     const list = groups.get(ref.provider_id) ?? [];
     list.push(ref.model);
     groups.set(ref.provider_id, list);
@@ -65,12 +99,21 @@ export function ModelPickerSheet({
 
   const currentIsStale =
     !!current &&
-    !!candidates &&
-    !candidates.some((c) => c.provider_id === current.provider_id && c.model === current.model);
+    !!displayedCandidates &&
+    !displayedCandidates.some(
+      (c) => c.provider_id === current.provider_id && c.model === current.model,
+    );
 
   return (
-    <Sheet visible={visible} title={title} onClose={onClose}>
-      {isLoading && !candidates ? <Loading label={tc('state.loading')} /> : null}
+    <Sheet
+      visible={visible}
+      title={title}
+      closeDisabled={!!busy}
+      onClose={onClose}
+      footer={footer}
+    >
+      {children}
+      {isLoading && !displayedCandidates ? <Loading label={tc('state.loading')} /> : null}
 
       {unresolved ? (
         <ErrorState
@@ -99,7 +142,7 @@ export function ModelPickerSheet({
         </View>
       ) : null}
 
-      {candidates && candidates.length === 0 ? (
+      {displayedCandidates && displayedCandidates.length === 0 ? (
         <EmptyState
           icon="cube-outline"
           title={t('defaults.noCandidates')}
@@ -119,12 +162,14 @@ export function ModelPickerSheet({
                 key={`${providerId}:${model}`}
                 accessibilityRole="button"
                 disabled={busy}
+                {...a11yState({ selected: active, disabled: !!busy })}
                 onPress={() => onSelect({ provider_id: providerId, model })}
                 style={({ pressed }) => [
                   styles.row,
                   {
                     borderColor: active ? colors.primary : colors.border,
                     backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
+                    opacity: busy ? 0.5 : 1,
                   },
                 ]}
               >
@@ -142,12 +187,16 @@ export function ModelPickerSheet({
         </View>
       ))}
 
-      {current ? (
+      {showClear && current ? (
         <Pressable
           accessibilityRole="button"
           disabled={busy}
+          {...a11yState({ disabled: !!busy })}
           onPress={onClear}
-          style={({ pressed }) => [styles.clear, { opacity: pressed ? 0.6 : 1 }]}
+          style={({ pressed }) => [
+            styles.clear,
+            { opacity: busy ? 0.5 : pressed ? 0.6 : 1 },
+          ]}
         >
           <Ionicons name="trash-outline" size={16} color={colors.danger} />
           <Text style={[styles.clearText, { color: colors.danger }]}>{t('defaults.clear')}</Text>

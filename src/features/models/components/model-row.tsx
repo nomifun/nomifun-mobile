@@ -1,52 +1,58 @@
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 import { Button, Tag } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { a11yState } from '@/utils/a11y';
 import { HealthDot } from '@/features/models/components/health-dot';
-import type { ProviderModelResponse } from '@/features/models/types';
+import { MODEL_TASK_ORDER, type HealthStatus, type ModelTask, type ProviderModelCapabilityResponse, type ProviderModelResponse } from '@/features/models/types';
 
 interface ModelRowProps {
   row: ProviderModelResponse;
-  /** Provider-level switch is off — the row cannot be called at all. */
   providerDisabled?: boolean;
-  /** Managed provider: display only. */
   readOnly?: boolean;
   busy?: boolean;
-  checking?: boolean;
+  checkingTask?: ModelTask | null;
   onToggle?: (enabled: boolean) => void;
-  onHeartbeat?: () => void;
-  onEditTasks?: () => void;
+  onHeartbeat?: (task: ModelTask) => void;
+  onEdit?: () => void;
   onDelete?: () => void;
 }
 
-/**
- * One catalog row. The desktop packs 9 controls onto a single line; on a phone
- * we keep the four that matter (enabled / 任务标签 / heartbeat / delete) and show
- * the rest — traits, context limit, protocol, inferred-vs-user — as read-only
- * tags, because those are desktop-side decisions.
- */
+function primaryCapability(row: ProviderModelResponse): ProviderModelCapabilityResponse | undefined {
+  return MODEL_TASK_ORDER.map((task) => row.capabilities.find((capability) => capability.task === task)).find(
+    (capability): capability is ProviderModelCapabilityResponse => capability !== undefined,
+  );
+}
+
+function capabilityHealth(capability: ProviderModelCapabilityResponse | undefined): HealthStatus {
+  return capability?.health?.status ?? 'unknown';
+}
+
 export function ModelRow({
   row,
   providerDisabled,
   readOnly,
   busy,
-  checking,
+  checkingTask = null,
   onToggle,
   onHeartbeat,
-  onEditTasks,
+  onEdit,
   onDelete,
 }: ModelRowProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
-
-  const health = row.health?.status ?? 'unknown';
-  const untagged = row.tasks.length === 0;
+  const primary = primaryCapability(row);
+  const health = capabilityHealth(primary);
+  const capabilities = [...row.capabilities].sort(
+    (a, b) => MODEL_TASK_ORDER.indexOf(a.task) - MODEL_TASK_ORDER.indexOf(b.task),
+  );
+  const unhealthy = capabilities.filter((capability) => capability.health?.status === 'unhealthy');
   const healthText =
     health === 'healthy'
-      ? t('models.healthy', { latency: row.health?.latency ?? 0 })
+      ? t('models.healthy', { latency: primary?.health?.latency ?? 0 })
       : health === 'unhealthy'
         ? t('models.unhealthy')
         : t('models.unknown');
@@ -63,63 +69,96 @@ export function ModelRow({
         </Text>
         {readOnly ? null : (
           <Switch
+            accessibilityLabel={t('models.enabled')}
             value={row.enabled}
-            disabled={busy}
+            disabled={!!busy}
             onValueChange={(next) => onToggle?.(next)}
             trackColor={{ true: colors.primary, false: colors.border }}
           />
         )}
       </View>
 
-      <View style={styles.tags}>
-        {row.tasks.map((task) => (
-          <Tag key={task} tone={task === 'chat' ? 'neutral' : 'primary'}>
-            {t(`task.${task}`)}
-          </Tag>
-        ))}
-        {row.traits.map((trait) => (
-          <Tag key={trait} tone="neutral">
-            {t(`trait.${trait}`)}
-          </Tag>
-        ))}
-        {untagged ? <Tag tone="warning">{t('models.untagged')}</Tag> : null}
-        {row.source === 'inferred' && !untagged ? <Tag tone="neutral">{t('models.inferred')}</Tag> : null}
-      </View>
-
-      {untagged ? (
-        <Text style={[styles.hint, { color: colors.warning }]}>{t('models.untaggedHint')}</Text>
-      ) : null}
       {row.description ? (
         <Text style={[styles.hint, { color: colors.textTertiary }]} numberOfLines={2}>
           {row.description}
         </Text>
       ) : null}
 
+      <View style={styles.tags}>
+        {capabilities.map((capability) => (
+          <Tag
+            key={capability.task}
+            tone={capability.task === 'chat' ? 'neutral' : 'primary'}
+          >
+            {t(`task.${capability.task}`)}
+          </Tag>
+        ))}
+      </View>
+
+      <View style={styles.capabilityList}>
+        {capabilities.map((capability) => {
+          const status = capabilityHealth(capability);
+          const isChecking = checkingTask === capability.task;
+          return (
+            <View
+              key={capability.task}
+              style={[styles.capabilityRow, { borderTopColor: colors.border }]}
+            >
+              <HealthDot status={status} size={8} />
+              <View style={styles.capabilityText}>
+                <Text style={[styles.capabilityName, { color: colors.text }]}>
+                  {t(`task.${capability.task}`)}
+                </Text>
+                <Text style={[styles.hint, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {capability.protocol || t('editor.protocolPending')} ·{' '}
+                  {capability.connection_role || 'default'}
+                </Text>
+              </View>
+              {readOnly ? null : (
+                <Button
+                  small
+                  variant="secondary"
+                  loading={isChecking}
+                  disabled={!!providerDisabled || !!busy}
+                  onPress={() => onHeartbeat?.(capability.task)}
+                >
+                  {t('models.heartbeat')}
+                </Button>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      {unhealthy.length > 0 ? (
+        <Text style={[styles.hint, { color: colors.danger }]} numberOfLines={2}>
+          {unhealthy
+            .map((capability) => capability.health?.error)
+            .filter((message): message is string => !!message)
+            .join(' · ')}
+        </Text>
+      ) : null}
+
       <View style={styles.footRow}>
         <Text style={[styles.health, { color: colors.textTertiary }]} numberOfLines={2}>
-          {checking ? t('models.checking') : healthText}
-          {health === 'unhealthy' && row.health?.error ? ` · ${row.health.error}` : ''}
+          {checkingTask ? t('models.checking') : healthText}
         </Text>
         {readOnly ? null : (
           <View style={styles.actions}>
-            <Button small variant="secondary" disabled={busy} onPress={onEditTasks}>
+            <Button small variant="secondary" disabled={!!busy} onPress={onEdit}>
               {t('models.editTasks')}
-            </Button>
-            <Button
-              small
-              variant="secondary"
-              loading={checking}
-              disabled={providerDisabled}
-              onPress={onHeartbeat}
-            >
-              {t('models.heartbeat')}
             </Button>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('models.delete')}
+              disabled={!!busy}
+              {...a11yState({ disabled: !!busy })}
               onPress={onDelete}
               hitSlop={8}
-              style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.6 : 1 }]}
+              style={({ pressed }) => [
+                styles.iconButton,
+                { opacity: busy ? 0.4 : pressed ? 0.6 : 1 },
+              ]}
             >
               <Ionicons name="trash-outline" size={18} color={colors.danger} />
             </Pressable>
@@ -142,9 +181,17 @@ const styles = StyleSheet.create({
   name: { flex: 1, fontSize: FontSize.md, fontWeight: '600' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   hint: { fontSize: FontSize.xs, lineHeight: 17 },
+  capabilityList: { gap: Spacing.xs },
+  capabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.sm,
+  },
+  capabilityText: { flex: 1, gap: 1 },
+  capabilityName: { fontSize: FontSize.sm, fontWeight: '600' },
   footRow: {
-    // Wraps on narrow phones: the health line takes the full width and the
-    // three controls drop onto their own row instead of squeezing.
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',

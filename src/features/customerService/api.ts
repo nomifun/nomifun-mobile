@@ -14,6 +14,7 @@
  *   after creation.
  */
 import { api } from '@/api/client';
+import { orderSelectorProviders } from '@/features/models/selectors';
 
 import {
   normalizeChannelPluginStatus,
@@ -173,17 +174,28 @@ export async function listKnowledgeBases(): Promise<KnowledgeBaseSummary[]> {
 
 export async function listProviders(): Promise<ProviderSummary[]> {
   const rows = await api<unknown>('/api/providers');
-  return asArray(rows)
+  return orderSelectorProviders(
+    asArray(rows)
     .map(normalizeProvider)
-    .filter((provider) => provider.enabled);
+    .filter((provider) => provider.enabled),
+  );
 }
 
 /** Authoritative chat-capable (provider, model) catalog. */
 export async function resolveChatModels(): Promise<CatalogModelRef[]> {
-  const res = await api<{ models?: CatalogModelRef[] }>('/api/model-profiles/resolve', {
-    body: { task: 'chat' },
-  });
-  return Array.isArray(res?.models) ? res.models : [];
+  const providers = await listProviders();
+  return providers.flatMap((provider) =>
+    (provider.models ?? [])
+      .filter(
+        (model) =>
+          model.enabled === true &&
+          model.capabilities.some((capability) => capability.task === 'chat'),
+      )
+      .map((model) => ({
+        provider_id: provider.provider_id,
+        model: model.model,
+      })),
+  );
 }
 
 /** All channel bots; the CS pool is filtered client-side by owner_domain. */
