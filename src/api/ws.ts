@@ -13,7 +13,7 @@
  * - A 75s staleness watchdog guards against half-open sockets (mobile
  *   backgrounding produces sockets that report OPEN forever).
  */
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 import { connectionStore } from './connection';
 
@@ -30,6 +30,18 @@ type TopicHandler = (data: unknown) => void;
 
 const STALE_MS = 75_000;
 const MAX_BACKOFF_MS = 15_000;
+
+function socketUrl(baseUrl: string): string {
+  if (Platform.OS === 'web') {
+    const location = globalThis.location;
+    if (!location?.host) {
+      throw new Error('WebSocket location is unavailable');
+    }
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${location.host}/ws`;
+  }
+  return `${baseUrl.replace(/^http/, 'ws')}/ws`;
+}
 
 class NomifunSocket {
   private ws: WebSocket | null = null;
@@ -128,9 +140,12 @@ class NomifunSocket {
     this.teardown();
     this.setStatus(this.wasConnectedOnce ? 'reconnecting' : 'connecting');
 
-    const url = `${binding.baseUrl.replace(/^http/, 'ws')}/ws`;
     let ws: WebSocket;
     try {
+      // H5 must use an absolute same-origin URL; browser WebSocket rejects
+      // a relative value such as "/ws". The dev/production proxy then keeps
+      // HTTP and WebSocket on the same origin.
+      const url = socketUrl(binding.baseUrl);
       // JWT as subprotocol: works on browsers and RN alike.
       ws = new WebSocket(url, [binding.token]);
     } catch {
@@ -162,7 +177,17 @@ class NomifunSocket {
       const topic = envelope.name ?? envelope.event;
       if (!topic) return;
       if (topic === 'ping') {
-        this.send('pong', null);
+        // Keep the heartbeat envelope compatible with the desktop contract:
+        // echo the server timestamp when present, and still produce a useful
+        // timestamp for older/defensive servers that omit it.
+        const timestamp =
+          envelope.data &&
+          typeof envelope.data === 'object' &&
+          'timestamp' in envelope.data &&
+          typeof (envelope.data as { timestamp?: unknown }).timestamp === 'number'
+            ? (envelope.data as { timestamp: number }).timestamp
+            : Date.now();
+        this.send('pong', { timestamp });
         return;
       }
       this.dispatch(topic, envelope.data ?? envelope.payload ?? null);

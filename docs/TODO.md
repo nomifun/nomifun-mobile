@@ -29,13 +29,24 @@ web 端附件已可用（`<input type=file>` → `POST /api/fs/upload` → 消�
 - RN 的 FormData file 形状是非标准的 `{uri,name,type}`，web 与 native 会分叉两套上传代码；
 - **HEIC 必须客户端转码**（服务端 `image_attachments.rs` 对 HEIC 是硬报错，会让整轮发送失败），要么让 picker 直接输出 jpeg，要么再加 `expo-image-manipulator`。
 
-## 延后：跨公网中继（nomifun-net-infra）
+## 延后：Relay 一键部署与 provisioning
 
-**状态**：中继服务端本身还没开发好，手机端不做对接。
+**状态**：Mobile 已能连接 Relay 的业务入口，且已完成 loopback
+`Mobile → Relay → nfagent → Desktop` 联调；但还没有把 Relay 部署、agent
+注册、隧道创建做成 Mobile 内的一键产品流程。
 
-一期已为它留好路：连接页支持手输任意 `host:port`（含域名与 https），协议与局域网完全一致——用户自建 `nomifun-web` 或做端口转发时现在就能连上。真正接中继时预计只需在连接页多一种入口 + 中继侧身份换取，业务层与 WS 层不用动。
+当前刻意保持以下边界：
 
-注意（`docs/research/connectivity.md`）：反向代理场景下 `/ws` 握手要求保留原始 `Host`，否则 403，症状是"一直显示执行中、刷新才更新"。
+- Relay admin password 只在 operator 侧使用，绝不进入 Mobile；
+- Mobile 不直接调用 Relay 管理员 API；
+- 不把长期 enrol token 固定写入客户端；
+- 一键化应通过部署脚本/Docker Compose、operator-side bootstrap，或短时
+  invite/provision token 实现；
+- 公网 HTTPS/WSS、ACME、NAT、防火墙和多网卡地址选择需要单独验收。
+
+连接页接受桌面端或 Relay **业务入口**的 `host:port` / HTTP(S) 地址；Relay
+控制台端口不能填入 Mobile。详细流程和已验证命令见
+[`docs/RELAY-INTEGRATION.md`](RELAY-INTEGRATION.md)。
 
 ---
 

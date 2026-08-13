@@ -4,9 +4,12 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-import { qrLogin } from '@/api/auth';
 import { ApiError } from '@/api/types';
-import { parseQrPayload } from '@/api/utils';
+import {
+  InvalidPairingUrlError,
+  parseConnectionPayload,
+  redeemConnectionPayload,
+} from '@/api/pairing';
 import { Button, Screen, toast } from '@/components/ui';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,8 +52,7 @@ export default function ScanScreen() {
 
   const onScanned = async ({ data }: { data: string }) => {
     if (consumedRef.current || busy) return;
-    const parsed = parseQrPayload(data);
-    if (!parsed) {
+    if (!parseConnectionPayload(data)) {
       setError(t('qrInvalid'));
       return;
     }
@@ -58,12 +60,14 @@ export default function ScanScreen() {
     setBusy(true);
     setError('');
     try {
-      const user = await qrLogin(parsed.baseUrl, parsed.qrToken);
+      const user = await redeemConnectionPayload(data);
       toast.success(t('connectedAs', { username: user.username }));
       router.dismissAll();
     } catch (err) {
       consumedRef.current = false;
-      if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
+      if (err instanceof InvalidPairingUrlError) {
+        setError(t('qrInvalid'));
+      } else if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
         setError(t('qrExpired'));
       } else {
         setError(t('probeFailed'));

@@ -28,6 +28,7 @@
  *   NOMI_E2E_TIMEOUT    default action timeout in ms           [15000]
  *   NOMI_E2E_PROJECT_DIR directory used by the project flow    [/tmp/nomi-e2e-project]
  *   NOMI_E2E_PLAYWRIGHT dir holding node_modules/playwright    [this repo]
+ *   NOMI_E2E_EXECUTABLE_PATH browser executable to launch      [Playwright-managed Chromium]
  */
 import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -46,6 +47,7 @@ export const env = {
   slowMo: Number(process.env.NOMI_E2E_SLOWMO ?? 0),
   timeout: Number(process.env.NOMI_E2E_TIMEOUT ?? 15_000),
   projectDir: process.env.NOMI_E2E_PROJECT_DIR ?? '/tmp/nomi-e2e-project',
+  executablePath: process.env.NOMI_E2E_EXECUTABLE_PATH?.trim() || undefined,
 };
 
 /**
@@ -126,7 +128,11 @@ export async function playwright() {
 export async function launch() {
   const { chromium, devices } = await playwright();
   await mkdir(env.shots, { recursive: true });
-  const browser = await chromium.launch({ headless: !env.headed, slowMo: env.slowMo });
+  const browser = await chromium.launch({
+    headless: !env.headed,
+    slowMo: env.slowMo,
+    ...(env.executablePath ? { executablePath: env.executablePath } : {}),
+  });
   const context = await browser.newContext({
     ...devices['iPhone 13'],
     // The app is same-origin with the API through the dev proxy; a fixed locale

@@ -6,7 +6,12 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { normalizeBaseUrl, parseQrPayload, randomHex } from '@/api/utils';
+import {
+  normalizeBaseUrl,
+  normalizeServerBaseUrl,
+  parseQrPayload,
+  randomHex,
+} from '@/api/utils';
 
 const TOKEN = 'a'.repeat(64);
 
@@ -102,6 +107,50 @@ describe('normalizeBaseUrl', () => {
 
   it('leaves an interior path alone', () => {
     expect(normalizeBaseUrl('http://h:1/webui/')).toBe('http://h:1/webui');
+  });
+});
+
+describe('normalizeServerBaseUrl', () => {
+  it('accepts a full HTTP or HTTPS URL', () => {
+    expect(normalizeServerBaseUrl(' https://relay.example.com:19090/ ')).toBe(
+      'https://relay.example.com:19090',
+    );
+    expect(normalizeServerBaseUrl('http://192.168.1.5:25808')).toBe(
+      'http://192.168.1.5:25808',
+    );
+  });
+
+  it('accepts bare hosts, host:port, and IPv6 literals', () => {
+    expect(normalizeServerBaseUrl('relay.example.com')).toBe(
+      'http://relay.example.com:25808',
+    );
+    expect(normalizeServerBaseUrl('relay.example.com:19090')).toBe(
+      'http://relay.example.com:19090',
+    );
+    expect(normalizeServerBaseUrl('2001:db8::5', '19090')).toBe(
+      'http://[2001:db8::5]:19090',
+    );
+    expect(normalizeServerBaseUrl('[::1]:25808')).toBe('http://[::1]:25808');
+  });
+
+  it('preserves a reverse-proxy path prefix', () => {
+    expect(normalizeServerBaseUrl('https://relay.example.com/nomifun/')).toBe(
+      'https://relay.example.com/nomifun',
+    );
+  });
+
+  it('rejects unsafe or unsupported forms', () => {
+    for (const value of [
+      '',
+      '   ',
+      'ftp://relay.example.com:19090',
+      'http://user:pass@relay.example.com:19090',
+      'http://relay.example.com:19090?x=1',
+      'http://relay.example.com:19090#x',
+      'not a host',
+    ]) {
+      expect(normalizeServerBaseUrl(value)).toBeNull();
+    }
   });
 });
 

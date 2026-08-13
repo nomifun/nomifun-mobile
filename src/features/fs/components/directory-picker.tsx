@@ -113,14 +113,18 @@ export function DirectoryPicker({
     return () => clearTimeout(timer);
   }, [createdNotice]);
 
-  // Windows has no meaningful default directory, so open on the drive list.
-  // `platform` arrives asynchronously, hence the effect rather than lazy state.
+  // Windows has no meaningful default directory, so the picker used without
+  // caller-provided shortcuts opens on the drive list. A caller that supplies
+  // `shortcuts` is explicitly opting into the start screen (for example, the
+  // project-session flow's recent directories), so do not jump away from
+  // those entries before the user can tap one. `platform` arrives
+  // asynchronously, hence the effect rather than lazy state.
   useEffect(() => {
-    if (!visible || initialPath || !isWindows) return;
+    if (!visible || initialPath || !isWindows || shortcuts !== undefined) return;
     if (navigated.current || autoJumped.current || path !== null) return;
     autoJumped.current = true;
     setPath('');
-  }, [visible, initialPath, isWindows, path]);
+  }, [visible, initialPath, isWindows, path, shortcuts]);
 
   const goTo = useCallback((next: string) => {
     navigated.current = true;

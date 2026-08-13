@@ -3,8 +3,9 @@
 NomiFun 的手机端（Android / iOS / H5），基于 **Expo (React Native)**。
 
 手机是“随身入口”：所有引擎执行、24h 持续工作都由 **NomiFun Desktop** 承担，
-手机通过局域网直连桌面端的 WebUI HTTP/WS API，与桌面状态完全互通，并增强
-移动场景能力（扫码连接、完成通知）。
+手机通过桌面端 WebUI 的 HTTP/WS API，与桌面状态完全互通，并增强移动场景
+能力（扫码连接、完成通知）。桌面端既可以被手机局域网直连，也可以通过
+`nomifun-net-infra` 的 Relay 业务隧道承载。
 
 ## NomiFun 开源产品家族
 
@@ -58,18 +59,21 @@ NomiFun 没有把 Desktop 简单包装成一个依赖厂商云端的手机网页
   同一套 WebUI API 查看实时状态、发送指令并接收完成通知。
 - **控制与实时事件分离**：业务查询和命令走 HTTP `/api/*`；流式回复、任务状态等
   增量事件复用一个 WebSocket `/ws`，减少轮询和重复实现。
-- **直连而非 NomiFun 云端中转**：在同一可信局域网内，Mobile 直接访问 Desktop
-  按需开启的 LAN 监听器，数据不会为了远控而先经过 NomiFun 运营的云端服务器。
+- **连接路径由用户控制**：可信局域网内可直接访问 Desktop；跨网可使用自部署的
+  `nomifun-net-infra` Relay、VPN/Tailscale 或带 TLS 的安全反向代理。Mobile 只访问
+  Desktop API 或 Relay 业务入口，不接触 Relay 管理员 API。
 
 这种架构让同一个 Desktop 中枢可以同时服务桌面 UI、Mobile 和机器人载体：核心能力
 与数据规则只有一份，客户端只负责适合各自设备的交互，因此跨端状态一致，也不会在
 每个终端重复维护一套 Agent 引擎。
 
 ```
-┌──────────────┐   HTTP /api/* (Bearer JWT + CSRF 双提交)   ┌──────────────────┐
-│ nomifun-mobile│ ◄────────────────────────────────────────► │ NomiFun Desktop  │
-│ (Expo RN App) │   WS /ws ({name,data} 信封, JWT subprotocol)│ (内嵌 WebUI 服务器)│
-└──────────────┘                                            └──────────────────┘
+┌──────────────┐   HTTP /api/* + WS /ws   ┌──────────────────┐   QUIC   ┌──────────────┐
+│ NomiFun Mobile│ ◄──────────────────────► │ Relay 业务入口   │ ◄──────► │ nfagent      │
+│ (Expo RN/H5) │       Bearer JWT          └──────────────────┘          └──────┬───────┘
+└──────┬───────┘                                                                  │
+       │ 也可局域网直连                                                             ▼
+       └──────────────────────────────────────────────────────────────► NomiFun Desktop
 ```
 
 - Desktop 默认只有本机回环监听器；只有用户主动开启“WebUI 远程访问”时，才按需创建
@@ -77,18 +81,23 @@ NomiFun 没有把 Desktop 简单包装成一个依赖厂商云端的手机网页
 - 连接方式一（推荐）：App 扫描 Desktop 面板生成的二维码
   （`http://<ip>:25808/qr-login?token=…`）。二维码 token 仅短时有效且只能消费一次，
   成功认证后再换取有期限的 JWT；二维码只能由 Desktop 本机生成。
-- 连接方式二：手输 `IP:端口` + 用户名密码（密码显示在桌面端面板上）。
+- 连接方式一也接受未来 Desktop 生成的 `nomi://pair?v=1&url=…` 配对包；
+  它只包裹现有的 Desktop QR 登录 URL，Mobile 仍通过 `/api/auth/qr-login`
+  兑换 JWT，不会接触 Relay 管理员密码或 enrol token。
+- 连接方式二：手输桌面端或 Relay **业务入口**地址 + 用户名密码（密码显示在
+  桌面端面板上）。Relay 控制台端口不是 Mobile 的连接地址。
 - 远程 HTTP 请求使用 Bearer JWT 与 CSRF 双提交保护，WebSocket 也需要认证；认证凭据
   应像登录密码一样妥善保存，设备丢失或网络环境变化时应在 Desktop 侧撤销或重置。
 - H5 形态必须与服务端**同源**部署/代理（浏览器跨域 Cookie 限制），开发期由
   `scripts/dev-proxy.mjs` 合并到同一端口；原生 App 无此限制，直接绝对地址访问。
-- 当前 LAN 入口是 HTTP 明文通信，适用于**可信局域网**；需要跨网访问时，应由用户
-  自行部署 VPN、Tailscale 或带 TLS 的安全反向代理，不能直接把端口暴露到公网。
+- 当前 LAN 入口和未终止 TLS 的 raw Relay 隧道都是 HTTP 明文通信，只适用于可信网络
+  或临时联调；跨网生产部署必须配置 HTTPS/WSS、VPN/Tailscale 或等价安全边界。
 - “无 NomiFun 云端中转”不等于“所有能力完全离线”：Desktop 是否访问第三方云模型
   取决于用户选择的模型供应商，Mobile 也必须能够连接到正在运行的 Desktop。
 - 进一步阅读：[Mobile 连接、认证与安全边界](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/connectivity.md)、
   [HTTP + WebSocket 实时协议](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/ws-protocol.md)、
-  [Desktop WebUI 远程访问](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md)。
+  [Desktop WebUI 远程访问](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md)、
+  [Relay 集成](docs/RELAY-INTEGRATION.md) 与 [配对 URL 契约](docs/PAIRING-URL.md)。
 
 ## 开发（Ubuntu，H5 优先）
 
@@ -113,6 +122,12 @@ bun run dev        # = Expo web (8081) + 开发代理 (8788，绑 0.0.0.0)
 
 浏览器/手机访问 `http://<本机IP>:8788`，用密码登录即可。
 环境变量：`NOMIFUN_SERVER`（默认 `http://127.0.0.1:8787`）、`PORT`（默认 8788）。
+
+Relay 的初始化、agent 入网、业务隧道创建、端口边界和本地验收见
+[`docs/RELAY-INTEGRATION.md`](docs/RELAY-INTEGRATION.md)。注意：
+Mobile 只使用 Relay 的业务入口端口，不持有 Relay 管理员凭据。
+如果要按当前三项目自动配对流程从头复测，请直接照着
+[`docs/PUBLIC-RELAY-TEST.md`](docs/PUBLIC-RELAY-TEST.md) 操作。
 
 > ⚠️ 登录接口有限流：**15 分钟内 5 次失败**即锁定，调试时别反复试错密码。
 
@@ -145,8 +160,12 @@ docs/FOUNDATION.md 基础设施契约
 
 ## 一期边界
 
-- 仅局域网直连；`nomifun-net-infra` 公网中继暂未接入（手输地址已兼容自建
-  `nomifun-web` 域名部署，协议一致）。
+- Mobile 已兼容任意 HTTP(S) 桌面端或 Relay 业务入口地址；Relay 的实际部署、
+  agent 注册和隧道生命周期由运维侧负责。
+- 当前没有把 Relay 管理员 API 暴露给 Mobile，也没有把部署、provisioning、
+  NAT/ACME/公网可达性包装成「一键连接」。loopback 联调通过不代表公网验收通过。
+- pairing URL 目前只是 Mobile 侧的解析/兑换兼容层；Desktop/Relay 尚未被本轮
+  修改，现有 Desktop QR URL 仍是首选输入格式。
 - 渠道机器人创建、知识库管理、MCP/技能、终端等重交互留在桌面端。
 
 ## 联系与交流
