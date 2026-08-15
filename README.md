@@ -4,6 +4,9 @@
 
 NomiFun 的手机端（Android / iOS / H5），基于 **Expo (React Native)**。
 
+源码仓库：[GitHub](https://github.com/nomifun/nomifun-mobile) ·
+[Gitee（中国区镜像）](https://gitee.com/nomifun/nomifun-mobile)
+
 手机是“随身入口”：所有引擎执行、24h 持续工作都由 **NomiFun Desktop** 承担，
 手机通过桌面端 WebUI 的 HTTP/WS API，与桌面状态完全互通，并增强移动场景
 能力（扫码连接、完成通知）。桌面端既可以被手机局域网直连，也可以通过
@@ -17,10 +20,10 @@ NomiFun 由四个互相关联的开源项目组成。**Desktop 是本地 AI 与�
 
 | 项目 | 定位 | 了解与参与 |
 |---|---|---|
-| [NomiFun Desktop](https://github.com/nomifun/nomifun-desktop) | Windows / macOS / Linux 本地 AI 工作站，负责模型、Agent、Skills、知识、任务、数据和开放接口；是 Mobile 与小智云台的能力中枢 | [产品介绍](https://www.nomifun.com/zh/products/desktop/) · [源码](https://github.com/nomifun/nomifun-desktop) · [WebUI / Mobile 接入](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md) |
-| **[NomiFun Mobile](https://github.com/nomifun/nomifun-mobile)**（本仓库） | Android / iOS / H5 随身客户端，通过 HTTP / WebSocket 使用 Desktop 的会话、任务、需求、伙伴与模型能力 | [产品介绍](https://www.nomifun.com/zh/products/mobile/) · [源码](https://github.com/nomifun/nomifun-mobile) · [连接与认证协议](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/connectivity.md) |
-| [NomiFun 小智云台](https://github.com/nomifun/nomifun-xiaozhi-yuntai) | ESP32-S3 小智机器人与云台工程，连接 Desktop 的伙伴能力，面向语音、动作和实体交互 | [产品介绍与演示](https://www.nomifun.com/zh/products/xiaozhi-yuntai/) · [源码](https://github.com/nomifun/nomifun-xiaozhi-yuntai) · [接入 Desktop](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/xiaozhi-robot.zh.md) |
-| [NomiFun Net Infra](https://github.com/nomifun/nomifun-net-infra) | 自托管的 NomiRelay 网络中继，把 NAT 后的 Desktop 或其他 HTTP/WebSocket/TCP/UDP 服务提供给跨网络手机与 IoT 设备 | [产品介绍](https://www.nomifun.com/zh/products/net-infra/) · [源码](https://github.com/nomifun/nomifun-net-infra) · [接入文档](https://www.nomifun.com/zh/docs/guides/net-infra/) |
+| NomiFun Desktop（[GitHub](https://github.com/nomifun/nomifun-desktop) · [Gitee](https://gitee.com/nomifun/nomifun-desktop)） | Windows / macOS / Linux 本地 AI 工作站，负责模型、Agent、Skills、知识、任务、数据和开放接口；是 Mobile 与小智云台的能力中枢 | [产品介绍](https://www.nomifun.com/zh/products/desktop/) · [WebUI / Mobile 接入](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md) |
+| **NomiFun Mobile**（本仓库；[GitHub](https://github.com/nomifun/nomifun-mobile) · [Gitee](https://gitee.com/nomifun/nomifun-mobile)） | Android / iOS / H5 随身客户端，通过 HTTP / WebSocket 使用 Desktop 的会话、任务、需求、伙伴与模型能力 | [产品介绍](https://www.nomifun.com/zh/products/mobile/) · [连接与认证协议](https://github.com/nomifun/nomifun-mobile/blob/main/docs/research/connectivity.md) |
+| NomiFun 小智云台（[GitHub](https://github.com/nomifun/nomifun-xiaozhi-yuntai) · [Gitee](https://gitee.com/nomifun/nomifun-xiaozhi-yuntai)） | ESP32-S3 小智机器人与云台工程，连接 Desktop 的伙伴能力，面向语音、动作和实体交互 | [产品介绍与演示](https://www.nomifun.com/zh/products/xiaozhi-yuntai/) · [接入 Desktop](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/xiaozhi-robot.zh.md) |
+| NomiFun Net Infra（[GitHub](https://github.com/nomifun/nomifun-net-infra) · [Gitee](https://gitee.com/nomifun/nomifun-net-infra)） | 自托管的 NomiRelay 网络中继，把 NAT 后的 Desktop 或其他 HTTP/WebSocket/TCP/UDP 服务提供给跨网络手机与 IoT 设备 | [产品介绍](https://www.nomifun.com/zh/products/net-infra/) · [接入文档](https://www.nomifun.com/zh/docs/guides/net-infra/) |
 
 产品总览与四个项目的入口也可以从 [NomiFun 官网](https://www.nomifun.com/zh/products/) 获取。
 
