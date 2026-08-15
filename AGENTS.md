@@ -1,12 +1,21 @@
 # Repository Guidelines (nomifun-mobile)
 
-## Git attribution (mandatory)
+## Efficient validation
 
-AI models (Claude or any other) may assist with work in this repository but
-must NEVER appear as the Git author, committer, co-author, or credited
-contributor. Do not add `Co-Authored-By` trailers or any AI-credit lines to
-commit messages. Commits are always attributed to the human maintainer's
-configured Git identity.
+- Choose the smallest checks that cover the changed behavior. Documentation-
+  only edits do not require an application build.
+- For UI or API changes, prefer targeted type checks and tests for the affected
+  feature before broader web validation. Android and iOS builds are only
+  required when the change is platform-specific or release-bound.
+- If a relevant platform or tool is unavailable, report the gap; unrelated
+  changes are not blocked by a repository-wide test requirement.
+
+## Git workflow
+
+- Use the contributor's configured Git identity; no custom attribution hook is
+  required.
+- Preserve unrelated work, inspect staged files, and do not force-push shared
+  branches without explicit authorization.
 
 ## Project shape
 
