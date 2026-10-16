@@ -1,0 +1,60 @@
+{
+  "picker": {
+    "title": "选择目录",
+    "up": "返回上一级",
+    "start": "回到常用位置",
+    "startTitle": "常用位置",
+    "home": "主目录",
+    "homeHint": "桌面端登录账号的家目录",
+    "workspace": "工作区根目录",
+    "drives": "此电脑（磁盘）",
+    "drivesHint": "先选一个盘符再往下浏览",
+    "manual": "手动输入路径",
+    "manualHint": "以「.」开头的隐藏目录（例如 ~/.config/xxx）不会出现在列表里，只能手动输入路径来定位。",
+    "newFolder": "新建文件夹",
+    "select": "选择当前目录",
+    "modified": "修改于 {{time}}",
+    "emptyTitle": "这个目录下没有子文件夹",
+    "emptyHint": "可以直接选择当前目录；隐藏目录（以「.」开头）不会显示，需要手动输入路径。",
+    "truncated": "仅显示前 {{count}} 项，更多目录请用「手动输入路径」定位。",
+    "driveHint": "请先选择一个磁盘，盘符列表本身不能作为工作目录。"
+  },
+  "manual": {
+    "title": "手动输入路径",
+    "label": "目录绝对路径",
+    "placeholder": "/home/you/projects/demo",
+    "hint": "支持以 ~ 开头。会先让桌面端校验目录是否存在，然后使用桌面端返回的规范路径。",
+    "submit": "校验并选择"
+  },
+  "newFolder": {
+    "title": "新建文件夹",
+    "label": "文件夹名称",
+    "placeholder": "my-project",
+    "hint": "只能是一层名称，不能包含「/」或「\\」；创建成功后会直接进入这个目录。",
+    "submit": "创建",
+    "created": "已创建「{{name}}」"
+  },
+  "risky": {
+    "warning": "agent 将以此目录为主工作区并可在其中读写，建议选一个具体的项目目录。",
+    "whitespace": "路径里有某一层的首尾带空格，桌面端会拒绝这样的工作目录，建议换一个目录。"
+  },
+  "errors": {
+    "emptyInput": "请先输入目录路径",
+    "notFound": "路径不存在或无法访问，请检查是否写错了",
+    "notDirectory": "这不是一个目录，或路径无法解析",
+    "outsideSandbox": "这个路径不在桌面端允许浏览的范围内",
+    "ownerRequired": "当前账号没有浏览桌面端文件的权限，需要用安装所有者账号登录",
+    "authExpired": "登录状态已失效，请重新连接桌面端",
+    "csrf": "安全校验失败，请重新连接桌面端后再试",
+    "network": "与桌面端的连接中断了，请确认桌面端仍在运行",
+    "server": "桌面端返回错误：{{message}}",
+    "unknown": "读取目录失败",
+    "nameRequired": "请输入文件夹名称",
+    "nameEdgeWhitespace": "名称的首尾不能有空格",
+    "nameExists": "这个名字已经被占用了",
+    "invalidName": "文件夹名称只能是一层，不能包含「/」「\\」等分隔符",
+    "parentNotFound": "上级目录不存在或无法访问",
+    "parentRequired": "请先进入一个目录，再新建文件夹",
+    "createDenied": "桌面端没有权限在这个目录里新建文件夹"
+  }
+}

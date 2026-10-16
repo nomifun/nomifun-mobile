@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "bun": "1.4.3",
+      "env": {
+        "BUN_INSTALL_CACHE_DIR": "/home/expo/workingdir/build/.bun-cache"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "bun": "1.4.3",
+      "env": {
+        "BUN_INSTALL_CACHE_DIR": "/home/expo/workingdir/build/.bun-cache"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascApiKeyPath": "./keys/AuthKey_3BA5BW2784.p8",
+        "ascApiKeyId": "3BA5BW2784",
+        "ascApiKeyIssuerId": "c5a99e4a-89a9-40e1-a913-4e73bdb54c72"
+      }
+    }
+  }
+}

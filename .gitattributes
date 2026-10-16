@@ -1,0 +1,3 @@
+# Dependency patches contain significant diff-context whitespace.
+# Preserve the pinned patch bytes across Windows checkouts.
+patches/*.patch text eol=lf -whitespace
