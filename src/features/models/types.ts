@@ -17,6 +17,7 @@ export type ModelTask =
   | 'image_generation'
   | 'image_edit'
   | 'video_generation'
+  | 'music_generation'
   | 'speech_synthesis'
   | 'speech_recognition'
   | 'embedding'
@@ -24,14 +25,12 @@ export type ModelTask =
 
 export type ModelTrait =
   | 'vision_input'
-  | 'function_calling'
-  | 'reasoning'
   | 'web_search'
   | 'audio_input'
-  | 'audio_output'
-  | 'video_input'
-  | 'realtime'
-  | 'streaming';
+  | 'video_input';
+
+export type ModelTechnicalCapability = 'function_calling' | 'reasoning' | 'streaming';
+export type ModelContextLimitKind = 'input_only' | 'combined';
 
 /** Canonical display and serialization order used by the desktop editor. */
 export const MODEL_TASK_ORDER: readonly ModelTask[] = [
@@ -40,6 +39,7 @@ export const MODEL_TASK_ORDER: readonly ModelTask[] = [
   'image_generation',
   'image_edit',
   'video_generation',
+  'music_generation',
   'speech_synthesis',
   'speech_recognition',
   'embedding',
@@ -50,11 +50,6 @@ export const MODEL_TRAIT_ORDER: readonly ModelTrait[] = [
   'vision_input',
   'video_input',
   'audio_input',
-  'audio_output',
-  'realtime',
-  'streaming',
-  'function_calling',
-  'reasoning',
   'web_search',
 ];
 
@@ -67,6 +62,7 @@ export interface CapabilityHealth {
   error_kind?: string;
   http_status?: number;
   attempted_url?: string;
+  unsupported_technical_capabilities?: ModelTechnicalCapability[];
 }
 
 /** Kept for the provider response; secret fields are intentionally absent. */
@@ -93,6 +89,7 @@ export interface ProviderModelCapabilityInput {
   provider_params?: unknown;
   context_limit?: number;
   output_limit?: number;
+  compaction_threshold_pct?: number;
 }
 
 export interface ProviderModelCapabilityResponse {
@@ -109,6 +106,7 @@ export interface ProviderModelCapabilityResponse {
   provider_params: unknown;
   context_limit?: number;
   output_limit?: number;
+  compaction_threshold_pct?: number;
   health?: CapabilityHealth;
   health_checked_at?: number;
   created_at: number;
@@ -117,6 +115,7 @@ export interface ProviderModelCapabilityResponse {
 
 export interface ProviderModelInput {
   model: string;
+  display_name?: string | null;
   enabled?: boolean;
   description?: string | null;
   sort_order?: number;
@@ -126,6 +125,7 @@ export interface ProviderModelInput {
 export interface ProviderModelResponse {
   provider_id: string;
   model: string;
+  display_name?: string;
   enabled: boolean;
   sort_order: number;
   description?: string;
@@ -150,6 +150,7 @@ export interface ProviderResponse {
 }
 
 export interface CreateProviderBody {
+  provider_id?: string;
   platform: string;
   name: string;
   base_url: string;
@@ -219,12 +220,20 @@ export interface ModelInfo {
   id: string;
   name?: string | null;
   tasks?: ModelTask[];
+  tasks_source?: 'provider_declared' | 'official_documentation' | 'inferred';
   traits?: ModelTrait[];
   context_limit?: number;
+  output_limit?: number;
+  token_limit_sources?: {
+    context_limit?: string;
+    output_limit?: string;
+    context_limit_kind?: ModelContextLimitKind;
+  };
 }
 
 export interface FetchModelsResponse {
   models: ModelInfo[];
+  catalog_source?: 'remote' | 'official_documentation';
   fixed_base_url?: string;
 }
 
@@ -371,6 +380,138 @@ export interface ModelProtocolManifestResponse {
   auth_schemes: AuthSchemeDescriptor[];
   recommendation: ProtocolRecommendation | null;
   protocols: ProtocolDescriptor[];
+  model_defaults?: ModelConfigurationDefaults;
+}
+
+export interface ModelConfigurationDefaults {
+  model: string;
+  protocol_id: string;
+  context_limit?: number;
+  context_limit_kind?: ModelContextLimitKind;
+  output_limit?: number;
+  provider_params: Record<string, unknown>;
+  reasoning_efforts?: string[];
+  sources: string[];
+  checked_at: string;
+}
+
+export interface DiscoverModelProtocolsRequest {
+  model: string;
+  capability: ProviderModelCapabilityInput;
+  preferred_protocol?: string;
+  apply_recommended_defaults?: boolean;
+}
+
+export interface DiscoverModelProtocolsAnonymousRequest extends DiscoverModelProtocolsRequest {
+  platform: string;
+  base_url: string;
+  auth_scheme: string;
+  credentials: ProviderCredentials;
+  connections?: ProviderConnectionInput[];
+  bedrock_config?: BedrockConfig;
+}
+
+export interface ModelProtocolCandidate {
+  protocol: string;
+  capability?: ProviderModelCapabilityInput;
+  status: 'available' | 'incompatible' | 'inconclusive' | 'blocked';
+  evidence: 'verified_stream' | 'official_model' | 'catalog_task' | 'registered_only';
+  recommended: boolean;
+  probe_output_limit?: number;
+  message?: string;
+  error_kind?: string;
+  http_status?: number;
+  elapsed_ms: number;
+}
+
+export interface DiscoverModelProtocolsResponse {
+  selected_protocol?: string;
+  selected_capability?: ProviderModelCapabilityInput;
+  candidates: ModelProtocolCandidate[];
+  elapsed_ms: number;
+  config_revision?: number;
+}
+
+export interface ModelGatewayOperator {
+  name: string;
+  homepage_url: string | null;
+  console_url: string | null;
+  purchase_url: string | null;
+  terms_url: string | null;
+  privacy_url: string | null;
+}
+
+export interface ModelGatewayMetaResponse {
+  contract_version: string;
+  operator: ModelGatewayOperator;
+  capabilities: string[];
+  optional_endpoints: string[];
+}
+
+/** Monetary, quota and rate values are lossless decimal strings on the desktop API. */
+export interface ModelGatewayPrice {
+  task: ModelTask;
+  meter: string;
+  unit_size: string;
+  amount: string;
+  currency: string;
+}
+
+export interface ModelGatewayCatalogModel {
+  id: string;
+  display_name: string;
+  vendor: string;
+  tasks: ModelTask[];
+  task_endpoints: Record<string, { endpoints: string[]; preferred_endpoint: string }>;
+  context_window: number | null;
+  max_output_tokens: number | null;
+  input_modalities: string[];
+  traits: string[];
+  pricing: ModelGatewayPrice[];
+  included_in_plan: boolean;
+  status: string;
+}
+
+export interface ModelGatewayCatalogResponse {
+  contract_version: string;
+  models: ModelGatewayCatalogModel[];
+  imports: ProviderModelInput[];
+}
+
+export interface ModelGatewayAccountResponse {
+  contract_version: string;
+  plan: {
+    name: string;
+    period_start: string | null;
+    period_end: string | null;
+    quota: { unit: string; total: string | null; used: string };
+  } | null;
+  balance: { amount: string; currency: string };
+  key: { name: string; expires_at: string | null; quota_unit: string; remaining_quota: string | null };
+  rate_limits: {
+    requests_per_minute: string | null;
+    tokens_per_minute: string | null;
+    concurrent_requests: string | null;
+  };
+}
+
+export interface CreateModelGatewayRequest {
+  base_url: string;
+  api_key: string;
+  name: string;
+  models: string[];
+}
+
+export interface UpdateModelGatewayConnectionRequest {
+  base_url: string;
+  api_key?: string | null;
+  name?: string | null;
+}
+
+export interface SyncModelGatewayResponse {
+  added: number;
+  updated: number;
+  models: ProviderModelResponse[];
 }
 
 export interface ProviderConnectionDescriptor {

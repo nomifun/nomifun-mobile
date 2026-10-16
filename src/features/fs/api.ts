@@ -8,11 +8,9 @@
  * - The whole `/api/fs/*` group sits behind `protect_instance_owner`, so a
  *   logged-in but non-owner account gets a blanket 403 that has nothing to do
  *   with an expired session. The two must read differently to the user.
- * - `POST /api/agent-sessions` never re-validates the `workspace` path beyond
- *   shape; a bad path only explodes when the agent runtime starts. So every
- *   path this app stores must
- *   come from a `currentPath` that the server already canonicalized — that is
- *   what {@link resolveDirectory} is for.
+ * - `POST /api/agent-sessions` validates and freezes a real workspace directory.
+ *   The picker also resolves typed input through {@link resolveDirectory}, so
+ *   it presents the same canonical path the server will bind at creation.
  * - Hidden entries (`.`-prefixed) are filtered out of listings server-side, but
  *   a hidden directory can still be *browsed* directly. Manual input is the only
  *   way to reach `~/.config/x`, and it works.

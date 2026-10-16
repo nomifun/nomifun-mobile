@@ -132,6 +132,7 @@ export interface ProviderSummary {
   /** Optional for tolerant legacy fixtures and cached snapshots. */
   models?: Array<{
     model: string;
+    display_name?: string;
     enabled: boolean;
     sort_order: number;
     capabilities: Array<{ task: string }>;

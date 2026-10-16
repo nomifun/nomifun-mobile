@@ -212,6 +212,7 @@ export function normalizeProvider(raw: unknown): ProviderSummary {
         return [
           {
             model: modelId,
+            ...(asNullableText(model.display_name) ? { display_name: asText(model.display_name).trim() } : {}),
             enabled: asBool(model.enabled, true),
             sort_order: asInt(model.sort_order, 0),
             capabilities,

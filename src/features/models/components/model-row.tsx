@@ -8,6 +8,7 @@ import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { a11yState } from '@/utils/a11y';
 import { HealthDot } from '@/features/models/components/health-dot';
+import { modelDisplayLabel, modelPresentationRawId } from '../presentation';
 import {
   MODEL_TASK_ORDER,
   type HealthStatus,
@@ -74,7 +75,7 @@ export function ModelRow({
           style={[styles.name, { color: row.enabled ? colors.text : colors.textTertiary }]}
           numberOfLines={2}
         >
-          {row.model}
+          {modelDisplayLabel(row.model, row.display_name)}
         </Text>
         {readOnly ? null : (
           <Toggle
@@ -85,6 +86,10 @@ export function ModelRow({
           />
         )}
       </View>
+
+      {modelPresentationRawId(row.model, row.display_name) ? (
+        <Text selectable style={[styles.hint, { color: colors.textTertiary }]}>{row.model}</Text>
+      ) : null}
 
       {row.description ? (
         <Text style={[styles.hint, { color: colors.textTertiary }]} numberOfLines={2}>
@@ -118,6 +123,11 @@ export function ModelRow({
                   {capability.protocol || t('editor.protocolPending')} ·{' '}
                   {capability.connection_role || 'default'}
                 </Text>
+                {capability.health?.unsupported_technical_capabilities?.length ? (
+                  <Text style={[styles.hint, { color: colors.warning }]}>
+                    {t('models.unsupportedTechnical', { capabilities: capability.health.unsupported_technical_capabilities.map((item) => t(`technical.${item}`)).join(' · ') })}
+                  </Text>
+                ) : null}
               </View>
               {readOnly ? null : (
                 <Button

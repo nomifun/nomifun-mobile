@@ -25,19 +25,13 @@ import {
 } from '@/features/models/connection-form';
 import {
   capabilityInputsFromDefinition,
-  emptyCapabilityDraft,
   normalizeModelId,
   patchCapabilityDraft,
   validateModelDefinition,
   type CatalogCapabilitySuggestion,
   type ModelDefinitionDraft,
 } from '@/features/models/advanced';
-import {
-  applyProviderAutoConfiguration,
-  isAutoConfigurationPlatform,
-} from '@/features/models/auto-configuration';
 import { useModelProtocolManifests } from '@/features/models/hooks';
-import { useProviderAutoConfiguration } from '@/features/models/use-provider-auto-configuration';
 import { ModelDefinitionEditor } from './model-definition-editor';
 import type {
   ModelInfo,
@@ -101,12 +95,13 @@ export function AddProviderSheet({
 
   const [definition, setDefinition] = useState<ModelDefinitionDraft>({
     model: '',
-    capabilities: [emptyCapabilityDraft('chat')],
+    capabilities: [],
   });
   const [catalog, setCatalog] = useState<ModelInfo[] | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [discoveryPending, setDiscoveryPending] = useState(false);
   const [formError, setFormError] = useState('');
   const [pendingConnections, setPendingConnections] = useState<ProviderConnectionInput[]>([]);
   const [connectionEditor, setConnectionEditor] = useState<{
@@ -146,7 +141,7 @@ export function AddProviderSheet({
   // Always bootstrap chat as well. Besides giving chat forms a useful
   // recommendation, the manifest response is the backend authority for the
   // runtime platform/base URL of regional presets.
-  const manifests = useModelProtocolManifests(preset.preset, ['chat', ...selectedTasks], baseUrl);
+  const manifests = useModelProtocolManifests(preset.preset, ['chat', ...selectedTasks], baseUrl, definition.model);
   const platformOptions = useMemo(
     () =>
       PLATFORM_PRESETS.map((item, index) => ({ item, index })).filter(
@@ -182,6 +177,10 @@ export function AddProviderSheet({
         model: model.id,
         label: model.name ?? model.id,
         tasks: model.tasks ?? [],
+        tasksSource: model.tasks_source,
+        outputLimit: model.output_limit,
+        contextLimitKind: model.token_limit_sources?.context_limit_kind,
+        tokenLimitSources: model.token_limit_sources,
         traits: model.traits ?? [],
         ...(model.context_limit === undefined ? {} : { contextLimit: model.context_limit }),
       })),
@@ -212,21 +211,12 @@ export function AddProviderSheet({
   const bedrockConfig = isBedrock
     ? buildBedrockConfig(bedrockAuthMethod, bedrockRegion, bedrockProfile)
     : undefined;
+  // Local-only identity: prevent a late catalog response from applying to
+  // edited connection details or credentials. Never use secrets as cache keys.
+  const catalogContextSnapshot = JSON.stringify([runtimePlatform, baseUrl.trim(), authScheme.trim(), credentialsResult, bedrockConfig]);
+  const catalogContextRef = useRef(catalogContextSnapshot);
+  catalogContextRef.current = catalogContextSnapshot;
 
-  const autoConfigurationEnabled = isAutoConfigurationPlatform(runtimePlatform);
-  const autoConfiguration = useProviderAutoConfiguration({
-    enabled: visible && autoConfigurationEnabled,
-    platform: runtimePlatform,
-    baseUrl,
-    authScheme,
-    definition,
-    manifests: manifests.manifests,
-    loadingTasks: manifests.loadingTasks,
-    credentials:
-      credentialsResult.ok && credentialsResult.credentials !== undefined
-        ? credentialsResult.credentials
-        : undefined,
-  });
 
   const validation = validateModelDefinition(
     definition,
@@ -248,27 +238,7 @@ export function AddProviderSheet({
     })),
   );
 
-  const appliedAutoConfigurationRef = useRef('');
 
-  useEffect(() => {
-    const batch = autoConfiguration.data;
-    if (!batch || batch.detections.length === 0) return;
-    const signature = JSON.stringify(batch);
-    if (appliedAutoConfigurationRef.current === signature) return;
-    appliedAutoConfigurationRef.current = signature;
-    setDefinition((current) => applyProviderAutoConfiguration(current, batch.detections));
-    const primary = batch.detections[0];
-    if (
-      primary?.suggestedBaseUrl &&
-      !baseUrlDirty &&
-      baseUrl.trim() === batch.requestBaseUrl.trim()
-    ) {
-      setBaseUrl(primary.suggestedBaseUrl);
-    }
-    if (primary?.authScheme && !authSchemeDirty && authScheme.trim() !== primary.authScheme) {
-      setAuthScheme(primary.authScheme);
-    }
-  }, [authScheme, authSchemeDirty, autoConfiguration.data, baseUrl, baseUrlDirty]);
 
   const reset = () => {
     catalogRequestRef.current += 1;
@@ -289,8 +259,7 @@ export function AddProviderSheet({
     setBedrockAccessKeyId('');
     setBedrockSecretAccessKey('');
     setBedrockSessionToken('');
-    setDefinition({ model: '', capabilities: [emptyCapabilityDraft('chat')] });
-    appliedAutoConfigurationRef.current = '';
+    setDefinition({ model: '', capabilities: [] });
     setCatalog(null);
     setCatalogError('');
     setFormError('');
@@ -335,8 +304,7 @@ export function AddProviderSheet({
     setCatalog(null);
     setCatalogError('');
     setFormError('');
-    setDefinition({ model: '', capabilities: [emptyCapabilityDraft('chat')] });
-    appliedAutoConfigurationRef.current = '';
+    setDefinition({ model: '', capabilities: [] });
     setPendingConnections([]);
     setConnectionEditor(null);
     setConnectionError('');
@@ -454,6 +422,7 @@ export function AddProviderSheet({
     }
 
     const requestId = ++catalogRequestRef.current;
+    const requestedContext = catalogContextSnapshot;
     setCatalogLoading(true);
     setCatalogError('');
     try {
@@ -465,7 +434,7 @@ export function AddProviderSheet({
         ...(bedrockConfig ? { bedrock_config: bedrockConfig } : {}),
         try_fix: true,
       });
-      if (requestId !== catalogRequestRef.current || !visible) return;
+      if (requestId !== catalogRequestRef.current || requestedContext !== catalogContextRef.current || !visible) return;
       setCatalog(result.models);
       if (result.fixed_base_url && !baseUrlDirty) {
         setBaseUrl(result.fixed_base_url);
@@ -474,7 +443,7 @@ export function AddProviderSheet({
         setCatalogError(t('models.fetchFailed'));
       }
     } catch (error) {
-      if (requestId === catalogRequestRef.current && visible) {
+      if (requestId === catalogRequestRef.current && requestedContext === catalogContextRef.current && visible) {
         setCatalogError(errorMessage(error, t('models.fetchFailed')));
       }
     } finally {
@@ -509,7 +478,7 @@ export function AddProviderSheet({
       setFormError(isBedrock ? t('add.bedrockCredentialsRequired') : t('add.keyRequired'));
       return;
     }
-    if (!validation.valid || autoConfiguration.isLoading) {
+    if (!validation.valid || discoveryPending) {
       setFormError(t('add.capabilityInvalid'));
       return;
     }
@@ -530,6 +499,8 @@ export function AddProviderSheet({
         ...(bedrockConfig ? { bedrock_config: bedrockConfig } : {}),
         initial_model: {
           model: normalizeModelId(definition.model),
+          display_name: definition.displayName?.trim() || undefined,
+          description: definition.description?.trim() || undefined,
           enabled: true,
           capabilities,
         },
@@ -559,7 +530,7 @@ export function AddProviderSheet({
         <Button
           onPress={() => void save()}
           loading={saving}
-          disabled={!validation.valid || autoConfiguration.isLoading}
+          disabled={!validation.valid || discoveryPending}
         >
           {t('add.submit')}
         </Button>
@@ -741,19 +712,15 @@ export function AddProviderSheet({
         </Text>
       </Pressable>
 
-      {autoConfigurationEnabled ? (
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>
-          {autoConfiguration.isLoading
-            ? t('auto.detecting')
-            : autoConfiguration.data?.detections.length
-              ? t('auto.applied')
-              : t('auto.hint')}
-        </Text>
-      ) : null}
 
       <ModelDefinitionEditor
         value={definition}
         onChange={setDefinition}
+        discoveryContext={visible && credentialsResult.ok && credentialsResult.credentials !== undefined ? {
+          platform: runtimePlatform, baseUrl, authScheme, credentials: credentialsResult.credentials,
+          connections: pendingConnections, bedrockConfig,
+        } : undefined}
+        onDiscoveryPendingChange={setDiscoveryPending}
         providerBaseUrl={baseUrl}
         providerAuthScheme={authScheme}
         manifests={manifests.manifests}

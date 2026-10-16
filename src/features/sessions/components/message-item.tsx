@@ -14,6 +14,7 @@ import {
   actionableTruncatedRecovery,
   textBody,
   tipsBody,
+  turnOutcomeNotice,
   type ChatMessage,
 } from '../stream';
 import { markdownStyles } from './markdown-styles';
@@ -35,7 +36,7 @@ export const MessageItem = memo(function MessageItem({
   onRetryRecovery,
   onRecoveryAccepted,
 }: MessageItemProps) {
-  if (message.type === 'tips') {
+  if (message.type === 'tips' || message.type === 'agent_status') {
     return (
       <TipsBanner
         message={message}
@@ -145,7 +146,10 @@ function TipsBanner({
   const [stale, setStale] = useState(false);
   const [continueError, setContinueError] = useState('');
   const body = tipsBody(message.content);
-  if (!body.content.trim()) return null;
+  const outcomeNotice = message.type === 'agent_status' ? turnOutcomeNotice(message.content) : undefined;
+  const content = outcomeNotice ? t(`message.outcome.${outcomeNotice}`) : body.content.trim();
+  const inputRequest = body.user_input_request;
+  if (!content) return null;
 
   const palette =
     body.type === 'error'
@@ -160,7 +164,7 @@ function TipsBanner({
               icon: 'information-circle-outline' as const,
             };
 
-  const title =
+  const title = inputRequest ? t('message.inputRequired') :
     body.type === 'error'
       ? t('message.noticeError')
       : body.type === 'success'
@@ -181,8 +185,14 @@ function TipsBanner({
       <View style={styles.tipsBody}>
         <Text style={[styles.tipsTitle, { color: palette.fg }]}>{title}</Text>
         <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
-          {body.content.trim()}
+          {content}
         </Text>
+        {inputRequest ? (
+          <>
+            <Text style={[styles.tipsTitle, { color: palette.fg }]}>{t('message.remainingWork')}</Text>
+            <Text style={[styles.tipsText, { color: colors.textSecondary }]}>{inputRequest.remaining_work}</Text>
+          </>
+        ) : null}
         {showContinue ? (
           <Button
             icon="refresh-outline"

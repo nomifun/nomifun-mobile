@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Easing,
   Platform,
   Pressable,
   type PressableProps,
+  type PressableStateCallbackType,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
@@ -12,6 +14,16 @@ import { Motion } from '@/constants/theme';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+interface InteractiveState extends PressableStateCallbackType {
+  hovered: boolean;
+}
+
+type InteractiveProps = Omit<PressableProps, 'style' | 'children'> & {
+  feedback?: boolean;
+  style?: StyleProp<ViewStyle> | ((state: InteractiveState) => StyleProp<ViewStyle>);
+  children?: ReactNode | ((state: InteractiveState) => ReactNode);
+};
 
 /** One interaction boundary for pointer, touch, keyboard and reduced motion. */
 export function Interactive({
@@ -26,7 +38,7 @@ export function Interactive({
   feedback = true,
   disabled,
   ...props
-}: PressableProps & { feedback?: boolean }) {
+}: InteractiveProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const reduced = useReducedMotion();
   const [pressed, setPressed] = useState(false);

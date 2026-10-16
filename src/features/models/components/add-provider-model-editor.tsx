@@ -14,16 +14,11 @@ import {
   type CatalogCapabilitySuggestion,
   type ModelDefinitionDraft,
 } from '@/features/models/advanced';
-import {
-  applyProviderAutoConfiguration,
-  isAutoConfigurationPlatform,
-} from '@/features/models/auto-configuration';
 import { saveProviderModel } from '@/features/models/api';
 import { ModelDefinitionEditor } from './model-definition-editor';
 import { errorMessage } from '@/features/models/errors';
 import type { ProviderModelResponse } from '@/features/models/types';
 import { ProviderConnectionSheet } from './provider-connection-sheet';
-import { useProviderAutoConfiguration } from '@/features/models/use-provider-auto-configuration';
 
 interface AddProviderModelEditorProps {
   visible: boolean;
@@ -55,7 +50,7 @@ export function AddProviderModelEditor({
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
   const [definition, setDefinition] = useState<ModelDefinitionDraft>(() =>
-    catalogSuggestion?.tasks[0]
+    catalogSuggestion?.tasks[0] && catalogSuggestion.tasksSource !== 'inferred' && catalogSuggestion.tasksSource !== undefined
       ? applyCatalogSuggestionForTask(
           { model: modelId, capabilities: [] },
           catalogSuggestion,
@@ -64,19 +59,20 @@ export function AddProviderModelEditor({
       : { model: modelId, capabilities: [] },
   );
   const [saving, setSaving] = useState(false);
+  const [discoveryPending, setDiscoveryPending] = useState(false);
   const [error, setError] = useState('');
   const [connectionRequest, setConnectionRequest] = useState<{
     role: string;
     baseUrl?: string;
     authScheme?: string;
   } | null>(null);
-  const appliedAutoConfigurationRef = useRef('');
+  const initializedKey = useRef('');
 
   const selectedTasks = useMemo(
     () => definition.capabilities.map((capability) => capability.task),
     [definition.capabilities],
   );
-  const manifests = useModelProtocolManifests(providerPreset, selectedTasks, providerBaseUrl);
+  const manifests = useModelProtocolManifests(providerPreset, selectedTasks, providerBaseUrl, definition?.model);
   const connectionState = useProviderConnections(providerId, visible);
   const connectionDescriptors = connectionState.connections.map((connection) => ({
     role: connection.role,
@@ -99,22 +95,14 @@ export function AddProviderModelEditor({
     connectionDescriptors,
   );
 
-  const autoConfigurationEnabled = isAutoConfigurationPlatform(providerPreset);
-  const autoConfiguration = useProviderAutoConfiguration({
-    enabled: visible && autoConfigurationEnabled,
-    platform: providerPreset,
-    baseUrl: providerBaseUrl,
-    authScheme: providerAuthScheme,
-    definition,
-    manifests: manifests.manifests,
-    loadingTasks: manifests.loadingTasks,
-    providerId,
-  });
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { initializedKey.current = ''; return; }
+    const key = JSON.stringify([providerId, modelId]);
+    if (initializedKey.current === key) return;
+    initializedKey.current = key;
     setDefinition(
-      catalogSuggestion?.tasks[0]
+      catalogSuggestion?.tasks[0] && catalogSuggestion.tasksSource !== 'inferred' && catalogSuggestion.tasksSource !== undefined
         ? applyCatalogSuggestionForTask(
             { model: modelId, capabilities: [] },
             catalogSuggestion,
@@ -124,17 +112,8 @@ export function AddProviderModelEditor({
     );
     setError('');
     setConnectionRequest(null);
-    appliedAutoConfigurationRef.current = '';
-  }, [catalogSuggestion, modelId, visible]);
+  }, [catalogSuggestion, modelId, providerId, visible]);
 
-  useEffect(() => {
-    const batch = autoConfiguration.data;
-    if (!batch || batch.detections.length === 0) return;
-    const signature = JSON.stringify(batch);
-    if (appliedAutoConfigurationRef.current === signature) return;
-    appliedAutoConfigurationRef.current = signature;
-    setDefinition((current) => applyProviderAutoConfiguration(current, batch.detections));
-  }, [autoConfiguration.data]);
 
   const close = () => {
     if (!saving) onClose();
@@ -142,7 +121,7 @@ export function AddProviderModelEditor({
 
   const save = async () => {
     setError('');
-    if (!validation.valid || autoConfiguration.isLoading) {
+    if (!validation.valid || discoveryPending) {
       setError(t('add.capabilityInvalid'));
       return;
     }
@@ -157,6 +136,7 @@ export function AddProviderModelEditor({
         provider_id: providerId,
         model: {
           model: normalizeModelId(definition.model),
+          display_name: definition.displayName?.trim() || undefined,
           enabled: true,
           ...(definition.description === undefined
             ? {}
@@ -185,7 +165,7 @@ export function AddProviderModelEditor({
           <Button
             onPress={() => void save()}
             loading={saving}
-            disabled={connectionState.isLoading || autoConfiguration.isLoading}
+            disabled={connectionState.isLoading || discoveryPending}
           >
             {tc('actions.save')}
           </Button>
@@ -194,6 +174,9 @@ export function AddProviderModelEditor({
         <ModelDefinitionEditor
           value={definition}
           onChange={setDefinition}
+          discoveryContext={visible && connectionRequest === null ? { providerId, platform: providerPreset, baseUrl: providerBaseUrl, authScheme: providerAuthScheme,
+            configurationRevision: JSON.stringify(connectionState.connections.map((connection) => [connection.connection_id, connection.updated_at])) } : undefined}
+          onDiscoveryPendingChange={setDiscoveryPending}
           providerBaseUrl={providerBaseUrl}
           providerAuthScheme={providerAuthScheme}
           manifests={manifests.manifests}

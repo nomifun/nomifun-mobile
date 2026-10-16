@@ -32,6 +32,9 @@ import { ModelRow } from '@/features/models/components/model-row';
 import { ModelTasksSheet } from '@/features/models/components/model-tasks-sheet';
 import { ProviderConnectionsSection } from '@/features/models/components/provider-connections-section';
 import { ProviderEditSheet } from '@/features/models/components/provider-edit-sheet';
+import { ModelGatewayDetails } from '@/features/models/components/model-gateway-details';
+import { MODEL_GATEWAY_PLATFORM } from '@/features/models/gateway';
+import { modelDisplayLabel } from '@/features/models/presentation';
 import { confirmDestructive } from '@/features/models/confirm';
 import { errorMessage, isProviderInUse } from '@/features/models/errors';
 import { useProvider, useProviderModels } from '@/features/models/hooks';
@@ -84,6 +87,7 @@ export default function ProviderDetailScreen() {
   const [tasksRow, setTasksRow] = useState<ProviderModelResponse | null>(null);
 
   const managed = !!provider && isManagedProvider(provider.platform);
+  const gateway = provider?.platform === MODEL_GATEWAY_PLATFORM;
   const manifestPreset = provider
     ? manifestPresetForProvider({
         platform: provider.platform,
@@ -222,7 +226,7 @@ export default function ProviderDetailScreen() {
   const removeModel = (row: ProviderModelResponse) => {
     confirmDestructive({
       title: t('models.delete'),
-      message: t('models.deleteConfirm', { model: row.model }),
+      message: t('models.deleteConfirm', { model: modelDisplayLabel(row.model, row.display_name) }),
       confirmLabel: tc('actions.delete'),
       cancelLabel: tc('actions.cancel'),
       onConfirm: () => {
@@ -414,7 +418,7 @@ export default function ProviderDetailScreen() {
           <Text style={[styles.error, { color: colors.danger }]}>{providerActionError}</Text>
         ) : null}
 
-        {!managed ? (
+        {!managed && !gateway ? (
           <View style={styles.buttonStack}>
             <Button
               variant="secondary"
@@ -424,6 +428,7 @@ export default function ProviderDetailScreen() {
             >
               {t('test.action')}
             </Button>
+            <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('test.savedConfigHint')}</Text>
             <View style={styles.buttonRow}>
               <View style={styles.buttonFlex}>
                 <Button
@@ -454,7 +459,11 @@ export default function ProviderDetailScreen() {
         ) : null}
       </Card>
 
-      {!managed ? (
+      {gateway ? <ModelGatewayDetails provider={provider} onChanged={async () => {
+        await Promise.all([mutate(), mutateModels()]);
+      }} /> : null}
+
+      {!managed && !gateway ? (
         <>
           <View style={styles.action}>
             <Button
@@ -499,7 +508,7 @@ export default function ProviderDetailScreen() {
           title={t('models.empty')}
           description={managed ? t('list.managedHint') : t('models.emptyHint')}
           action={
-            managed ? undefined : (
+            managed || gateway ? undefined : (
               <Button variant="secondary" onPress={() => setAddOpen(true)}>
                 {t('models.add')}
               </Button>
@@ -530,7 +539,7 @@ export default function ProviderDetailScreen() {
               ? t('models.noCatalogEndpointHint')
               : t('models.mobileEditorHint')}
           </Text>
-          {rows.length > 0 ? (
+          {rows.length > 0 && !gateway ? (
             <View style={styles.action}>
               <Button variant="secondary" onPress={() => setAddOpen(true)}>
                 {t('models.add')}

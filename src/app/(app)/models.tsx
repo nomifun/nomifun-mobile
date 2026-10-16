@@ -24,6 +24,7 @@ import {
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AddProviderSheet } from '@/features/models/components/add-provider-sheet';
+import { ModelGatewaySetup } from '@/features/models/components/model-gateway-setup';
 import { DefaultsCard } from '@/features/models/components/defaults-card';
 import {
   ImageDefaultModelSheet,
@@ -50,6 +51,7 @@ export default function ModelsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
+  const { t: tg } = useTranslation('modelGateway');
 
   const { providers, error, isLoading, mutate } = useProviders();
   const { defaults, mutate: mutateDefaults } = useClientDefaults();
@@ -57,6 +59,7 @@ export default function ModelsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [gatewayOpen, setGatewayOpen] = useState(false);
   const [defaultSheet, setDefaultSheet] = useState<DefaultSheet>(null);
   const [savingDefault, setSavingDefault] = useState(false);
   const [defaultError, setDefaultError] = useState('');
@@ -219,6 +222,15 @@ export default function ModelsScreen() {
           </View>
         </>
       )}
+
+      <View style={styles.action}>
+        <Button variant="secondary" onPress={() => setGatewayOpen(true)}>{tg('addGateway')}</Button>
+      </View>
+
+      <ModelGatewaySetup visible={gatewayOpen} onClose={() => setGatewayOpen(false)} onCreated={() => {
+        setGatewayOpen(false);
+        void mutate();
+      }} />
 
       <AddProviderSheet
         visible={addOpen}

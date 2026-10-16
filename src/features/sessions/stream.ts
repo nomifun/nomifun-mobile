@@ -12,13 +12,14 @@ import type {
   MessageStatus,
   StoredMessage,
   AgentStreamErrorInfo,
+  AgentUserInputRequest,
   TruncatedTurnRecovery,
   ThinkingContent,
   TipsContent,
   ToolCallContent,
 } from './api';
 
-export type ChatMessageType = 'text' | 'thinking' | 'tips' | 'tool_call' | 'tool_group';
+export type ChatMessageType = 'text' | 'thinking' | 'tips' | 'tool_call' | 'tool_group' | 'agent_status';
 
 export interface ChatMessage {
   /** Stable React key: durable id when persisted, `msg_id|type` while streaming. */
@@ -87,6 +88,7 @@ const RENDERABLE = new Set<ChatMessageType>([
   'tips',
   'tool_call',
   'tool_group',
+  'agent_status',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -159,8 +161,24 @@ function asRecovery(value: unknown): TruncatedTurnRecovery | undefined {
   };
 }
 
+function asUserInputRequest(value: unknown): AgentUserInputRequest | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.request_id !== 'string' || !value.request_id.trim() ||
+      typeof value.question !== 'string' || !value.question.trim() ||
+      typeof value.remaining_work !== 'string' || !value.remaining_work.trim()) return undefined;
+  return { request_id: value.request_id, question: value.question, remaining_work: value.remaining_work };
+}
+
+/** Only committed server outcomes produce a notice; a finished turn alone proves no result. */
+export function turnOutcomeNotice(content: unknown): 'cancelled' | 'paused' | 'unavailable' | undefined {
+  if (!isRecord(content) || content.turn_summary !== true ||
+      typeof content.turn_id !== 'string' || !content.turn_id || !isRecord(content.turn_outcome)) return undefined;
+  const kind = content.turn_outcome.kind;
+  return kind === 'cancelled' || kind === 'paused' || kind === 'unavailable' ? kind : undefined;
+}
+
 function defaultPosition(type: ChatMessageType): MessagePosition {
-  return type === 'tips' ? 'center' : 'left';
+  return type === 'tips' || type === 'agent_status' ? 'center' : 'left';
 }
 
 // ── Persisted rows ─────────────────────────────────────────────────
@@ -170,6 +188,7 @@ export function fromStoredMessage(row: StoredMessage): ChatMessage | null {
   if (row.hidden === true) return null;
   const type = row.type as ChatMessageType;
   if (!RENDERABLE.has(type)) return null;
+  if (type === 'agent_status' && !turnOutcomeNotice(row.content)) return null;
   const turnId = isRecord(row.content) ? asString(row.content.turn_id) : '';
   return {
     key: row.message_id,
@@ -222,6 +241,8 @@ function mapWireType(wire: string): Mapped | undefined {
       return { type: 'tool_call', position: 'left' };
     case 'tool_group':
       return { type: 'tool_group', position: 'left' };
+    case 'agent_status':
+      return { type: 'agent_status', position: 'center' };
     default:
       return undefined;
   }
@@ -336,7 +357,7 @@ export function reduceStreamFrame(live: ChatMessage[], frame: StreamFrame): Chat
     case 'tips': {
       const body = isRecord(frame.data) ? frame.data : {};
       const content: TipsContent = {
-        content: textOf(frame.data),
+        ...tipsBody(frame.data),
         type: wire === 'error' ? 'error' : (asString(body.type) || 'warning'),
         ...(asErrorInfo(wire === 'error' ? frame.data : body.error)
           ? { error: asErrorInfo(wire === 'error' ? frame.data : body.error) }
@@ -347,6 +368,15 @@ export function reduceStreamFrame(live: ChatMessage[], frame: StreamFrame): Chat
       };
       if (!content.content) return live;
       return [...live, build(content, false)];
+    }
+    case 'agent_status': {
+      if (!turnOutcomeNotice(frame.data)) return live;
+      const notice = build(frame.data, false);
+      const at = msgId ? live.findIndex((message) => message.msgId === msgId && message.type === 'agent_status') : -1;
+      if (at < 0) return [...live, notice];
+      const next = [...live];
+      next[at] = { ...notice, createdAt: live[at].createdAt, key: live[at].key };
+      return next;
     }
     case 'tool_call': {
       const body = isRecord(frame.data) ? (frame.data as ToolCallContent) : {};
@@ -383,9 +413,11 @@ export function thinkingBody(content: unknown): ThinkingContent {
 
 export function tipsBody(content: unknown): TipsContent & { content: string; type: string } {
   const body = isRecord(content) ? content : {};
+  const request = body.type === 'error' ? undefined : asUserInputRequest(body.user_input_request);
   return {
-    content: textOf(content),
+    content: textOf(content) || request?.question || '',
     type: asString(body.type) || 'warning',
+    ...(request ? { user_input_request: request } : {}),
     ...(asErrorInfo(body.error) ? { error: asErrorInfo(body.error) } : {}),
     ...(asRecovery(body.recovery) ? { recovery: asRecovery(body.recovery) } : {}),
   };

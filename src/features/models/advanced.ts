@@ -9,6 +9,8 @@ import {
   MODEL_TASK_ORDER,
   MODEL_TRAIT_ORDER,
   type EndpointRootShape,
+  type ModelConfigurationDefaults,
+  type ModelInfo,
   type ModelProtocolManifestResponse,
   type ModelTask,
   type ModelTrait,
@@ -18,8 +20,6 @@ import {
 
 export type ModelProtocolManifest = ModelProtocolManifestResponse;
 export type ModelProtocolManifestMap = Partial<Record<ModelTask, ModelProtocolManifest>>;
-/** Conservative mobile default for protocols that require an output ceiling. */
-export const DEFAULT_REQUIRED_OUTPUT_LIMIT = 4_096;
 
 export const CAPABILITY_ENDPOINT_FIELDS = [
   'endpoint',
@@ -50,10 +50,16 @@ export interface ModelCapabilityDraft {
   providerParamsJson: string;
   contextLimit?: number;
   outputLimit?: number;
+  compactionThresholdPct?: number;
+  contextLimitSource?: 'user';
+  outputLimitSource?: 'user';
+  providerParamsSource?: 'user';
+  modelDefaults?: { model: string; contextLimit?: number; outputLimit?: number; providerParams: Record<string, unknown> };
 }
 
 export interface ModelDefinitionDraft {
   model: string;
+  displayName?: string;
   enabled?: boolean;
   description?: string;
   sortOrder?: number;
@@ -65,7 +71,11 @@ export interface CatalogCapabilitySuggestion {
   tasks: ModelTask[];
   traits: ModelTrait[];
   label?: string;
+  tasksSource?: 'provider_declared' | 'official_documentation' | 'inferred';
   contextLimit?: number;
+  outputLimit?: number;
+  contextLimitKind?: 'input_only' | 'combined';
+  tokenLimitSources?: ModelInfo['token_limit_sources'];
 }
 
 export type CapabilityValidationError =
@@ -82,6 +92,8 @@ export type CapabilityValidationError =
   | 'connection_missing'
   | 'base_url_required'
   | 'output_ceiling_required'
+  | 'invalid_token_limit'
+  | 'invalid_compaction_threshold'
   | 'cross_origin_consent_required'
   | 'invalid_provider_params';
 
@@ -94,6 +106,102 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const normalizeModelId = (value: string): string => value.trim();
+
+export const isValidModelTokenLimit = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+
+export const modelConfigurationDefaultsFor = (
+  manifest: ModelProtocolManifest | undefined,
+  model: string | undefined,
+  protocol?: string,
+): ModelConfigurationDefaults | undefined => {
+  const defaults = manifest?.model_defaults;
+  return defaults && defaults.model.trim() === model?.trim() &&
+    (protocol === undefined || defaults.protocol_id === protocol) ? defaults : undefined;
+};
+
+/** Drop only advisory values still owned by the previous exact model. */
+export const removeModelConfigurationDefaults = (capability: ModelCapabilityDraft): ModelCapabilityDraft => {
+  const previous = capability.modelDefaults;
+  if (!previous) return capability;
+  const { modelDefaults: _previousDefaults, ...next } = capability;
+  if (previous.contextLimit !== undefined && next.contextLimitSource !== 'user' && next.contextLimit === previous.contextLimit) next.contextLimit = undefined;
+  if (previous.outputLimit !== undefined && next.outputLimitSource !== 'user' && next.outputLimit === previous.outputLimit) next.outputLimit = undefined;
+  if (Object.keys(previous.providerParams).length > 0) {
+    const parsed = parseProviderParams(next.providerParamsJson);
+    if (parsed.ok) {
+      const params = { ...parsed.value };
+      for (const [key, value] of Object.entries(previous.providerParams)) {
+        if (JSON.stringify(params[key]) === JSON.stringify(value)) delete params[key];
+      }
+      next.providerParamsJson = Object.keys(params).length ? JSON.stringify(params, null, 2) : '';
+    }
+  }
+  return next;
+};
+
+/** Protocol-specific suggestions expire on a protocol change; catalog token facts stay model-owned. */
+const removeProtocolConfigurationDefaults = (capability: ModelCapabilityDraft): ModelCapabilityDraft => {
+  const previous = capability.modelDefaults;
+  if (!previous) return capability;
+  const parsed = parseProviderParams(capability.providerParamsJson);
+  if (!parsed.ok) return capability;
+  const params = { ...parsed.value };
+  const owned = { ...previous.providerParams };
+  for (const [key, value] of Object.entries(owned)) {
+    if (key === '_nomifun_context_limit_kind') continue;
+    if (JSON.stringify(params[key]) === JSON.stringify(value)) delete params[key];
+    delete owned[key];
+  }
+  return { ...capability, providerParamsJson: Object.keys(params).length ? JSON.stringify(params, null, 2) : '',
+    modelDefaults: { ...previous, providerParams: owned } };
+};
+
+export const changeModelDefinitionId = (definition: ModelDefinitionDraft, model: string): ModelDefinitionDraft =>
+  model.trim() === definition.model.trim() ? { ...definition, model } : {
+    ...definition,
+    model,
+    displayName: undefined,
+    capabilities: definition.capabilities.map(capability => {
+      const next = removeModelConfigurationDefaults(capability);
+      return capability.transportSource === 'auto'
+        ? { ...resetCapabilityTransport(next, 'blank'), providerParamsSource: undefined }
+        : next;
+    }),
+  };
+
+export const reconcileModelConfigurationDefaults = (
+  capabilities: readonly ModelCapabilityDraft[], manifests: ModelProtocolManifestMap, model: string,
+): ModelCapabilityDraft[] => capabilities.map((capability) => {
+  if (capability.transportSource === 'persisted') return capability;
+  const defaults = modelConfigurationDefaultsFor(manifests[capability.task], model, capability.protocol);
+  const base = capability.modelDefaults?.model !== model.trim() ? removeModelConfigurationDefaults(capability) : capability;
+  if (!defaults || capability.transportSource === 'user') return base;
+  const next = { ...base };
+  const owned: NonNullable<ModelCapabilityDraft['modelDefaults']> = { model: model.trim(), providerParams: { ...base.modelDefaults?.providerParams } };
+  if (base.modelDefaults?.contextLimit !== undefined) owned.contextLimit = base.modelDefaults.contextLimit;
+  if (base.modelDefaults?.outputLimit !== undefined) owned.outputLimit = base.modelDefaults.outputLimit;
+  if (next.contextLimit === undefined && next.contextLimitSource !== 'user' && isValidModelTokenLimit(defaults.context_limit)) {
+    next.contextLimit = defaults.context_limit;
+    owned.contextLimit = defaults.context_limit;
+  }
+  if (next.outputLimit === undefined && next.outputLimitSource !== 'user' && isValidModelTokenLimit(defaults.output_limit)) {
+    next.outputLimit = defaults.output_limit;
+    owned.outputLimit = defaults.output_limit;
+  }
+  const parsed = parseProviderParams(next.providerParamsJson);
+  if (parsed.ok && next.providerParamsSource !== 'user') {
+    const params = { ...parsed.value };
+    const suggestions = { ...defaults.provider_params,
+      ...(owned.contextLimit !== undefined && defaults.context_limit_kind ? { _nomifun_context_limit_kind: defaults.context_limit_kind } : {}) };
+    for (const [key, value] of Object.entries(suggestions)) {
+      if (!Object.prototype.hasOwnProperty.call(params, key)) { params[key] = value; owned.providerParams[key] = value; }
+    }
+    next.providerParamsJson = Object.keys(params).length ? JSON.stringify(params, null, 2) : '';
+  }
+  next.modelDefaults = owned;
+  return JSON.stringify(capability) === JSON.stringify(next) ? capability : next;
+});
 
 export const emptyCapabilityDraft = (task: ModelTask): ModelCapabilityDraft => ({
   task,
@@ -126,6 +234,7 @@ export const capabilityDraftFromResponse = (capability: {
   provider_params?: unknown;
   context_limit?: number;
   output_limit?: number;
+  compaction_threshold_pct?: number;
 }): ModelCapabilityDraft => ({
   task: capability.task,
   traits: capability.traits ? [...capability.traits] : [],
@@ -145,6 +254,7 @@ export const capabilityDraftFromResponse = (capability: {
       : '',
   contextLimit: capability.context_limit,
   outputLimit: capability.output_limit,
+  compactionThresholdPct: capability.compaction_threshold_pct,
 });
 
 export const addCapabilityTask = (
@@ -170,18 +280,15 @@ const CATALOG_TRAITS_BY_TASK: Readonly<Record<ModelTask, readonly ModelTrait[]>>
     'vision_input',
     'video_input',
     'audio_input',
-    'audio_output',
-    'streaming',
-    'function_calling',
-    'reasoning',
     'web_search',
   ],
-  realtime_conversation: ['audio_input', 'audio_output', 'realtime', 'streaming'],
+  realtime_conversation: [],
   image_generation: [],
   image_edit: [],
   video_generation: [],
   speech_synthesis: [],
   speech_recognition: [],
+  music_generation: [],
   embedding: [],
   rerank: [],
 };
@@ -191,37 +298,40 @@ export const applyCatalogSuggestionForTask = (
   suggestion: CatalogCapabilitySuggestion,
   task: ModelTask,
 ): ModelDefinitionDraft => {
-  const declaresTask = suggestion.tasks.includes(task);
-  const traits = declaresTask
-    ? MODEL_TRAIT_ORDER.filter(
-        (trait) =>
-          suggestion.traits.includes(trait) && CATALOG_TRAITS_BY_TASK[task].includes(trait),
-      )
-    : [];
-  const declaredWindow =
-    declaresTask && suggestion.contextLimit && suggestion.contextLimit > 0
-      ? suggestion.contextLimit
-      : undefined;
-  const known = definition.capabilities.some((capability) => capability.task === task);
-
-  return {
-    ...definition,
-    model: suggestion.model,
-    capabilities: known
-      ? definition.capabilities.map((capability) =>
-          capability.task === task && declaresTask
-            ? {
-                ...capability,
-                traits,
-                contextLimit: capability.contextLimit ?? declaredWindow,
-              }
-            : capability,
-        )
-      : [
-          ...definition.capabilities,
-          { ...emptyCapabilityDraft(task), traits, contextLimit: declaredWindow },
-        ],
-  };
+  const declaresTask = suggestion.tasks.includes(task) &&
+    (suggestion.tasksSource === 'provider_declared' || suggestion.tasksSource === 'official_documentation');
+  const base = changeModelDefinitionId(definition, suggestion.model);
+  const capabilities = addCapabilityTask(base.capabilities, task).map((capability) => {
+    if (capability.task !== task || !declaresTask) return capability;
+    const next = { ...capability, traits: MODEL_TRAIT_ORDER.filter((trait) =>
+      suggestion.traits.includes(trait) && CATALOG_TRAITS_BY_TASK[task].includes(trait)) };
+    const owned: NonNullable<ModelCapabilityDraft['modelDefaults']> = {
+      model: suggestion.model.trim(), providerParams: { ...capability.modelDefaults?.providerParams },
+      ...(capability.modelDefaults?.contextLimit === undefined ? {} : { contextLimit: capability.modelDefaults.contextLimit }),
+      ...(capability.modelDefaults?.outputLimit === undefined ? {} : { outputLimit: capability.modelDefaults.outputLimit }),
+    };
+    if (capability.transportSource !== 'persisted') {
+      if ((next.contextLimit === undefined || (owned.contextLimit !== undefined && next.contextLimit === owned.contextLimit)) && next.contextLimitSource !== 'user' && isValidModelTokenLimit(suggestion.contextLimit)) {
+        next.contextLimit = suggestion.contextLimit;
+        owned.contextLimit = suggestion.contextLimit;
+        const params = parseProviderParams(next.providerParamsJson);
+        if (suggestion.contextLimitKind && params.ok &&
+          (!Object.prototype.hasOwnProperty.call(params.value, '_nomifun_context_limit_kind') ||
+            (Object.prototype.hasOwnProperty.call(owned.providerParams, '_nomifun_context_limit_kind') &&
+              JSON.stringify(owned.providerParams._nomifun_context_limit_kind) === JSON.stringify(params.value._nomifun_context_limit_kind)))) {
+          next.providerParamsJson = JSON.stringify({ ...params.value, _nomifun_context_limit_kind: suggestion.contextLimitKind }, null, 2);
+          owned.providerParams._nomifun_context_limit_kind = suggestion.contextLimitKind;
+        }
+      }
+      if ((next.outputLimit === undefined || (owned.outputLimit !== undefined && next.outputLimit === owned.outputLimit)) && next.outputLimitSource !== 'user' && isValidModelTokenLimit(suggestion.outputLimit)) {
+        next.outputLimit = suggestion.outputLimit;
+        owned.outputLimit = suggestion.outputLimit;
+      }
+      next.modelDefaults = owned;
+    }
+    return next;
+  });
+  return { ...base, ...(suggestion.label && suggestion.label !== suggestion.model ? { displayName: suggestion.label } : {}), capabilities };
 };
 
 export const changePrimaryModelTask = (
@@ -259,7 +369,7 @@ export const changeCapabilityProtocol = (
       ? recommendation.default_base_url
       : '';
   return {
-    ...capability,
+    ...removeProtocolConfigurationDefaults(capability),
     transportSource: 'user',
     protocol: nextProtocol,
     connectionRole,
@@ -269,7 +379,7 @@ export const changeCapabilityProtocol = (
     contentEndpoint: '',
     realtimeEndpoint: '',
     allowCrossOriginCredentials: false,
-    providerParamsJson: '',
+    providerParamsJson: removeProtocolConfigurationDefaults(capability).providerParamsJson,
   };
 };
 
@@ -287,7 +397,7 @@ const resetCapabilityTransport = (
   contentEndpoint: '',
   realtimeEndpoint: '',
   allowCrossOriginCredentials: false,
-  providerParamsJson: '',
+  providerParamsJson: capability.providerParamsJson,
 });
 
 export const reconcileCapabilityRecommendations = (
@@ -322,16 +432,9 @@ export const reconcileCapabilityRecommendations = (
         : '';
     const protocolChanged = capability.protocol.trim() !== protocol;
     const base = protocolChanged
-      ? resetCapabilityTransport(capability, 'recommendation')
+      ? resetCapabilityTransport(removeProtocolConfigurationDefaults(capability), 'recommendation')
       : capability;
-    const recommendedDescriptor = manifest.protocols.find(
-      (descriptor) => descriptor.protocol_id === protocol,
-    );
-    const outputLimit =
-      base.outputLimit === undefined &&
-      recommendedDescriptor?.requires_output_ceiling === true
-        ? DEFAULT_REQUIRED_OUTPUT_LIMIT
-        : base.outputLimit;
+    const outputLimit = base.outputLimit;
     return protocol === base.protocol &&
       connectionRole === base.connectionRole &&
       baseUrlOverride === base.baseUrlOverride &&
@@ -368,16 +471,30 @@ export type ModelCapabilityDraftPatch = Partial<
 export const patchCapabilityDraft = (
   capability: ModelCapabilityDraft,
   patch: ModelCapabilityDraftPatch,
-): ModelCapabilityDraft => ({
+): ModelCapabilityDraft => {
+  let modelDefaults = capability.modelDefaults;
+  if (modelDefaults && Object.prototype.hasOwnProperty.call(patch, 'providerParamsJson')) {
+    const parsed = parseProviderParams(patch.providerParamsJson ?? '');
+    modelDefaults = { ...modelDefaults, providerParams: parsed.ok ? Object.fromEntries(
+      Object.entries(modelDefaults.providerParams).filter(([key, value]) =>
+        Object.prototype.hasOwnProperty.call(parsed.value, key) && JSON.stringify(parsed.value[key]) === JSON.stringify(value)),
+    ) : {} };
+  }
+  return {
   ...capability,
   ...patch,
+  ...(modelDefaults ? { modelDefaults } : {}),
   task: capability.task,
+  ...(Object.prototype.hasOwnProperty.call(patch, 'contextLimit') ? { contextLimitSource: 'user' as const } : {}),
+  ...(Object.prototype.hasOwnProperty.call(patch, 'outputLimit') ? { outputLimitSource: 'user' as const } : {}),
+  ...(Object.prototype.hasOwnProperty.call(patch, 'providerParamsJson') ? { providerParamsSource: 'user' as const } : {}),
   ...(Object.keys(patch).some((key) =>
     TRANSPORT_DRAFT_FIELDS.has(key as keyof ModelCapabilityDraft),
   )
     ? { transportSource: 'user' as const }
     : {}),
-});
+  };
+};
 
 export const protocolDescriptorForDraft = (
   capability: ModelCapabilityDraft,
@@ -624,6 +741,13 @@ export const validateModelDefinition = (
   }
 
   for (const capability of definition.capabilities) {
+    if ([capability.contextLimit, capability.outputLimit].some((value) => value !== undefined && !isValidModelTokenLimit(value))) {
+      errors.push({ task: capability.task, code: 'invalid_token_limit' });
+    }
+    if (capability.compactionThresholdPct !== undefined &&
+      (capability.task !== 'chat' || !Number.isInteger(capability.compactionThresholdPct) || capability.compactionThresholdPct < 50 || capability.compactionThresholdPct > 95)) {
+      errors.push({ task: capability.task, code: 'invalid_compaction_threshold' });
+    }
     if (loadingTasks.includes(capability.task)) {
       errors.push({ task: capability.task, code: 'manifest_loading' });
       continue;
@@ -730,6 +854,7 @@ export const capabilityInputFromDraft = (
   if (capability.outputLimit !== undefined && capability.outputLimit > 0) {
     input.output_limit = capability.outputLimit;
   }
+  if (capability.compactionThresholdPct !== undefined) input.compaction_threshold_pct = capability.compactionThresholdPct;
   return input;
 };
 

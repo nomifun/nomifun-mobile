@@ -69,7 +69,7 @@ export function ModelKnowledgeCard({
       />
       <SettingRow
         label={t('fields.model')}
-        value={agent.model ?? undefined}
+        value={agent.model ? models.modelLabel(agent.provider_id, agent.model) : undefined}
         placeholder={
           agent.provider_id ? t('fields.modelPlaceholder') : t('fields.modelNeedsProvider')
         }
@@ -135,7 +135,11 @@ export function ModelKnowledgeCard({
         visible={picker === 'model'}
         title={t('fields.model')}
         subtitle={providerLabel}
-        items={modelOptions.map((model) => ({ id: model, title: model }))}
+        items={modelOptions.map((model) => ({
+          id: model,
+          title: models.modelLabel(agent.provider_id, model),
+          subtitle: models.modelLabel(agent.provider_id, model) !== model ? model : undefined,
+        }))}
         selected={agent.model ? [agent.model] : []}
         emptyText={t('fields.noModels')}
         onPick={(model) => run({ model })}

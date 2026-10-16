@@ -13,7 +13,6 @@ import { useWsTopic } from '@/hooks/use-ws';
 import {
   CLIENT_SETTINGS_KEY,
   PROVIDERS_KEY,
-  modelProtocolsKey,
   pickClientDefaults,
   providerConnectionsKey,
   providerModelsKey,
@@ -27,6 +26,7 @@ import type {
   ModelProtocolManifestResponse,
   ModelTask,
   ModelTrait,
+  ModelTechnicalCapability,
   ProviderConnectionResponse,
   ProviderModelResponse,
   ProviderResponse,
@@ -58,7 +58,7 @@ export function orderProviders(
 export function useProviders(mode: 'management' | 'selector' = 'management') {
   const { data, error, isLoading, mutate } = useSWR<ProviderResponse[]>(PROVIDERS_KEY);
   const refresh = useCallback(() => mutate(), [mutate]);
-  useWsTopic('ws.reconnected', refresh);
+  useWsTopic(['ws.reconnected', 'providers.changed'], refresh);
 
   return {
     providers: data ? orderProviders(data, mode) : undefined,
@@ -86,7 +86,7 @@ export function useProviderModels(providerId: string) {
   const key = providerId ? providerModelsKey(providerId) : null;
   const { data, error, isLoading, mutate } = useSWR<ProviderModelResponse[]>(key);
   const refresh = useCallback(() => mutate(), [mutate]);
-  useWsTopic('ws.reconnected', refresh);
+  useWsTopic(['ws.reconnected', 'providers.changed'], refresh);
 
   const models = data
     ? [...data].sort(
@@ -100,7 +100,7 @@ export function useProviderModels(providerId: string) {
 export function useClientDefaults() {
   const { data, error, isLoading, mutate } = useSWR<Record<string, unknown>>(CLIENT_SETTINGS_KEY);
   const refresh = useCallback(() => mutate(), [mutate]);
-  useWsTopic('ws.reconnected', refresh);
+  useWsTopic(['ws.reconnected', 'providers.changed'], refresh);
 
   const defaults: ClientDefaults | undefined = data ? pickClientDefaults(data) : undefined;
   return { defaults, error: error as Error | undefined, isLoading, refresh, mutate };
@@ -115,14 +115,15 @@ export function useTaskModels(
   task: ModelTask,
   enabled = true,
   requiredTraits: readonly ModelTrait[] = [],
+  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
 ) {
   const providers = useProviders('selector');
   const candidates = useMemo<ModelRef[] | undefined>(() => {
     if (!providers.providers) return undefined;
     if (!enabled) return [];
 
-    return usableModelRefs(providers.providers, task, requiredTraits);
-  }, [enabled, providers.providers, requiredTraits, task]);
+    return usableModelRefs(providers.providers, task, requiredTraits, requiredTechnicalCapabilities);
+  }, [enabled, providers.providers, requiredTraits, requiredTechnicalCapabilities, task]);
 
   return {
     candidates,
@@ -141,7 +142,7 @@ export function useProviderConnections(providerId: string, enabled = true) {
     { revalidateOnFocus: false },
   );
   const refresh = useCallback(() => mutate(), [mutate]);
-  useWsTopic('ws.reconnected', refresh);
+  useWsTopic(['ws.reconnected', 'providers.changed'], refresh);
   return {
     connections: data ?? [],
     error: error as Error | undefined,
@@ -161,18 +162,16 @@ export function useModelProtocolManifests(
     () => [...new Set(tasks)],
     [tasks],
   );
+  const requestKey = JSON.stringify([preset ?? '', requestedTasks, baseUrl?.trim() ?? '', model?.trim() ?? '']);
   const key =
     preset && requestedTasks.length > 0
       ? [
           'model-protocol-manifests',
-          preset,
-          baseUrl ?? '',
-          model ?? '',
-          requestedTasks.join(','),
+          requestKey,
         ]
       : null;
   const { data, error, isLoading, mutate } = useSWR<
-    Record<ModelTask, ModelProtocolManifestResponse>
+    { requestKey: string; manifests: Partial<Record<ModelTask, ModelProtocolManifestResponse>> }
   >(
     key,
     async () => {
@@ -181,22 +180,23 @@ export function useModelProtocolManifests(
           fetchModelProtocolManifest(preset!, task, baseUrl, model),
         ),
       );
-      const manifests = {} as Record<ModelTask, ModelProtocolManifestResponse>;
+      const manifests: Partial<Record<ModelTask, ModelProtocolManifestResponse>> = {};
       settled.forEach((result, index) => {
         if (result.status === 'fulfilled') manifests[requestedTasks[index]] = result.value;
       });
-      return manifests;
+      return { requestKey, manifests };
     },
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
+  const current = data?.requestKey === requestKey ? data.manifests : undefined;
   const loadingTasks =
-    isLoading && !data ? requestedTasks : [];
+    key && !current && !error ? requestedTasks : [];
   const errorTasks =
-    error || (data && requestedTasks.some((task) => !data[task]))
-      ? requestedTasks.filter((task) => !data?.[task])
+    error || (current && requestedTasks.some((task) => !current[task]))
+      ? requestedTasks.filter((task) => !current?.[task])
       : [];
   return {
-    manifests: data ?? ({} as Partial<Record<ModelTask, ModelProtocolManifestResponse>>),
+    manifests: current ?? {},
     loadingTasks,
     errorTasks,
     error: error as Error | undefined,

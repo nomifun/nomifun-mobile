@@ -20,16 +20,11 @@ import {
   validateModelDefinition,
   type ModelDefinitionDraft,
 } from '@/features/models/advanced';
-import {
-  applyProviderAutoConfiguration,
-  isAutoConfigurationPlatform,
-} from '@/features/models/auto-configuration';
 import { saveProviderModel } from '@/features/models/api';
 import { errorMessage } from '@/features/models/errors';
 import type { ProviderModelResponse, ProviderConnectionDescriptor } from '@/features/models/types';
 import { ModelDefinitionEditor } from './model-definition-editor';
 import { ProviderConnectionSheet } from './provider-connection-sheet';
-import { useProviderAutoConfiguration } from '@/features/models/use-provider-auto-configuration';
 
 interface ModelTasksSheetProps {
   visible: boolean;
@@ -62,6 +57,7 @@ export function ModelTasksSheet({
   const { t: tc } = useTranslation('common');
   const [definition, setDefinition] = useState<ModelDefinitionDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [discoveryPending, setDiscoveryPending] = useState(false);
   const [error, setError] = useState('');
   const [connectionRequest, setConnectionRequest] = useState<{
     role: string;
@@ -69,13 +65,12 @@ export function ModelTasksSheet({
     authScheme?: string;
   } | null>(null);
   const initializedKeyRef = useRef<string | null>(null);
-  const appliedAutoConfigurationRef = useRef('');
 
   const selectedTasks = useMemo(
     () => definition?.capabilities.map((capability) => capability.task) ?? [],
     [definition],
   );
-  const manifests = useModelProtocolManifests(providerPlatform, selectedTasks, providerBaseUrl);
+  const manifests = useModelProtocolManifests(providerPlatform, selectedTasks, providerBaseUrl, definition?.model);
   const connectionState = useProviderConnections(row?.provider_id ?? '', visible && !!row);
   const connections: ProviderConnectionDescriptor[] = connectionState.connections.map(
     (connection) => ({
@@ -109,16 +104,6 @@ export function ModelTasksSheet({
     });
   };
 
-  const autoConfiguration = useProviderAutoConfiguration({
-    enabled: visible && isAutoConfigurationPlatform(providerPlatform) && definition !== null,
-    platform: providerPlatform,
-    baseUrl: providerBaseUrl,
-    authScheme: providerAuthScheme,
-    definition: definition ?? { model: row?.model ?? '', capabilities: [] },
-    manifests: manifests.manifests,
-    loadingTasks: manifests.loadingTasks,
-    providerId: row?.provider_id,
-  });
 
   useEffect(() => {
     if (!visible || !row) {
@@ -130,6 +115,7 @@ export function ModelTasksSheet({
     initializedKeyRef.current = key;
     setDefinition({
       model: row.model,
+      displayName: row.display_name,
       enabled: row.enabled,
       description: row.description,
       sortOrder: row.sort_order,
@@ -137,19 +123,8 @@ export function ModelTasksSheet({
     });
     setError('');
     setConnectionRequest(null);
-    appliedAutoConfigurationRef.current = '';
   }, [row, visible]);
 
-  useEffect(() => {
-    const batch = autoConfiguration.data;
-    if (!batch || batch.detections.length === 0) return;
-    const signature = JSON.stringify(batch);
-    if (appliedAutoConfigurationRef.current === signature) return;
-    appliedAutoConfigurationRef.current = signature;
-    setDefinition((current) =>
-      current ? applyProviderAutoConfiguration(current, batch.detections) : current,
-    );
-  }, [autoConfiguration.data]);
 
   const close = () => {
     if (!saving) onClose();
@@ -179,7 +154,7 @@ export function ModelTasksSheet({
   const save = async () => {
     if (!row || !definition || saving) return;
     setError('');
-    if (!validation.valid || autoConfiguration.isLoading) {
+    if (!validation.valid || discoveryPending) {
       setError(t('editor.capabilityInvalid'));
       return;
     }
@@ -194,6 +169,7 @@ export function ModelTasksSheet({
         provider_id: row.provider_id,
         model: {
           model: row.model,
+          display_name: definition.displayName?.trim() || null,
           enabled: definition.enabled,
           description:
             definition.description === undefined ? null : definition.description.trim() || null,
@@ -225,8 +201,7 @@ export function ModelTasksSheet({
             disabled={
               !definition ||
               !validation.valid ||
-              connectionState.isLoading ||
-              autoConfiguration.isLoading
+              connectionState.isLoading || discoveryPending
             }
           >
             {tc('actions.save')}
@@ -237,6 +212,9 @@ export function ModelTasksSheet({
           <ModelDefinitionEditor
             value={definition}
             onChange={updateDefinition}
+            discoveryContext={visible && row && connectionRequest === null ? { providerId: row.provider_id, platform: providerPlatform, baseUrl: providerBaseUrl, authScheme: providerAuthScheme,
+              configurationRevision: JSON.stringify([row.updated_at, connectionState.connections.map((connection) => [connection.connection_id, connection.updated_at])]) } : undefined}
+            onDiscoveryPendingChange={setDiscoveryPending}
             providerBaseUrl={providerBaseUrl}
             providerAuthScheme={providerAuthScheme}
             manifests={manifests.manifests}

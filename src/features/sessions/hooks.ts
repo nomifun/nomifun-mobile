@@ -12,12 +12,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { connectionStorageKey } from '@/api/connection';
+import { connectionStorageKey, connectionStore } from '@/api/connection';
 import useSWR from 'swr';
 import useSWRInfinite from 'swr/infinite';
 
 import { ApiError } from '@/api/types';
 import { useWsTopic } from '@/hooks/use-ws';
+import i18n from '@/i18n';
 
 import {
   CONVERSATION_PAGE_SIZE,
@@ -32,7 +33,9 @@ import {
   type Conversation,
   type Paginated,
   type StoredMessage,
+  type SendMessageResult,
 } from './api';
+import { cancelObservedTurn } from './turn-cancel';
 import { buildMessageContent, parseMessageContent } from './attachments';
 import {
   compareMessages,
@@ -416,6 +419,7 @@ export function useChatSession(
   const activeTurnId = useRef<string | null>(null);
   const completedTurnIds = useRef<Set<string>>(new Set());
   const awaitingTurn = useRef(false);
+  const pendingAcceptance = useRef<Promise<SendMessageResult> | null>(null);
   const runtimeGeneration = useRef(0);
 
   // Switching conversations resets every per-chat projection.
@@ -429,6 +433,7 @@ export function useChatSession(
     activeTurnId.current = null;
     completedTurnIds.current.clear();
     awaitingTurn.current = false;
+    pendingAcceptance.current = null;
     runtimeGeneration.current += 1;
   }, [conversationId]);
 
@@ -781,13 +786,16 @@ export function useChatSession(
       sawCompletion.current = false;
       setStreaming(true);
       let completedReceipt = false;
+      let acceptance: Promise<SendMessageResult> | undefined;
       try {
-        const result = await postMessage(
+        acceptance = postMessage(
           conversationId,
           content,
           files,
           idempotencyKey,
         );
+        pendingAcceptance.current = acceptance;
+        const result = await acceptance;
         failedSend.current = null;
         setLive((prev) =>
           prev.map((m) =>
@@ -831,6 +839,9 @@ export function useChatSession(
           // have been committed before this HTTP response was observed.
           reconcileSoon();
         } else {
+          if (!sawCompletion.current && !activeTurnId.current && !completedTurnIds.current.has(result.msg_id)) {
+            activeTurnId.current = result.msg_id;
+          }
           // A fresh acceptance may race or lose its turn.started event. Verify
           // the current runtime so the composer cannot remain optimistic
           // forever after a fast completion or a delivery gap.
@@ -844,6 +855,8 @@ export function useChatSession(
         awaitingTurn.current = false;
         setStreaming(false);
         throw err;
+      } finally {
+        if (pendingAcceptance.current === acceptance) pendingAcceptance.current = null;
       }
     },
     [conversationId, reconcile, reconcileRuntimeSoon, reconcileSoon],
@@ -864,9 +877,15 @@ export function useChatSession(
 
   const stop = useCallback(async () => {
     if (!conversationId) return;
-    await cancelTurn(conversationId);
+    const epoch = connectionStore.epoch();
+    const cancelled = await cancelObservedTurn(
+      activeTurnId.current ?? (sawCompletion.current ? undefined : conversation?.runtime?.active_turn_id),
+      pendingAcceptance.current,
+      (turnId) => cancelTurn(conversationId, turnId, epoch),
+    );
     reconcileRuntimeSoon();
-  }, [conversationId, reconcileRuntimeSoon]);
+    if (!cancelled) throw new Error(i18n.t('composer.turnIdentityUnavailable', { ns: 'sessions' }));
+  }, [conversationId, conversation?.runtime?.active_turn_id, reconcileRuntimeSoon]);
 
   return {
     messages,

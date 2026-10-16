@@ -22,6 +22,7 @@ import {
   textBody,
   thinkingBody,
   tipsBody,
+  turnOutcomeNotice,
   toolEntries,
 } from '@/features/sessions/stream';
 
@@ -187,6 +188,22 @@ describe('reduceStreamFrame — thinking', () => {
 });
 
 describe('reduceStreamFrame — tips and errors', () => {
+  it('keeps canonical handoff questions whose plain content is empty', () => {
+    const request = { request_id: 'ask:profile', question: '请提供姓名。', remaining_work: '收到资料后制作报告。' };
+    const data = { content: '', type: 'warning', user_input_request: request };
+    const live = fold([{ msg_id: 'handoff', type: 'tips', data, stream_complete: true }]);
+    expect(live).toHaveLength(1);
+    expect(tipsBody(live[0].content)).toEqual({ content: request.question, type: 'warning', user_input_request: request });
+    expect(tipsBody(data).user_input_request).toEqual(request);
+    expect(live[0].streaming).toBe(false);
+  });
+
+  it('does not turn malformed or error metadata into a handoff', () => {
+    expect(tipsBody({ user_input_request: { request_id: 'ask', question: 'Question' } }).content).toBe('');
+    expect(tipsBody({ type: 'error', content: 'Failed', user_input_request: {
+      request_id: 'ask', question: 'Question', remaining_work: 'Work',
+    } }).user_input_request).toBeUndefined();
+  });
   it('turns an error frame into a centered tip', () => {
     const live = fold([{ msg_id: 'm1', type: 'error', data: { content: 'boom' } }]);
     expect(live[0].type).toBe('tips');
@@ -256,6 +273,38 @@ describe('reduceStreamFrame — tips and errors', () => {
   it('drops an empty tip', () => {
     const live: ChatMessage[] = [];
     expect(reduceStreamFrame(live, { msg_id: 'm1', type: 'tips', data: {} })).toBe(live);
+  });
+});
+
+describe('canonical terminal outcome notices', () => {
+  const summary = (kind: string) => ({ turn_summary: true, turn_id: 'root', turn_state: 'completed', turn_outcome: { kind } });
+
+  it('retains canceled, paused and unprovable outcomes in live delivery and history', () => {
+    for (const kind of ['cancelled', 'paused', 'unavailable']) {
+      const content = summary(kind);
+      const live = fold([{ msg_id: kind, type: 'agent_status', data: content, stream_complete: true }]);
+      expect(turnOutcomeNotice(live[0].content)).toBe(kind);
+      expect(live[0].streaming).toBe(false);
+      const stored = fromStoredMessage({ message_id: kind, conversation_id: 'c', type: 'agent_status', content, created_at: 1 });
+      expect(stored?.type).toBe('agent_status');
+      expect(turnOutcomeNotice(stored?.content)).toBe(kind);
+    }
+  });
+
+  it('never infers success or duplicates an answered result from a finished status', () => {
+    const live: ChatMessage[] = [];
+    for (const data of [{ turn_summary: true, turn_state: 'completed' }, summary('answered'), summary('future_outcome')]) {
+      expect(reduceStreamFrame(live, { msg_id: 's', type: 'agent_status', data })).toBe(live);
+      expect(fromStoredMessage({ message_id: 's', conversation_id: 'c', type: 'agent_status', content: data, created_at: 1 })).toBeNull();
+    }
+  });
+
+  it('updates an existing summary without adding a second notice', () => {
+    const first = fold([{ msg_id: 's', type: 'agent_status', data: summary('paused') }, text('newer', 'Next reply')]);
+    const live = reduceStreamFrame(first, { msg_id: 's', type: 'agent_status', data: summary('cancelled') });
+    expect(live).toHaveLength(2);
+    expect(turnOutcomeNotice(live[0].content)).toBe('cancelled');
+    expect(textBody(live[1].content)).toBe('Next reply');
   });
 });
 

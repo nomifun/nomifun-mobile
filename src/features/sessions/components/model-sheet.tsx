@@ -60,7 +60,7 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
       });
       onChanged();
       onClose();
-      toast.success(t('model.switched', { model }));
+      toast.success(t('model.switched', { model: group.labels?.[model] ?? model }));
     } catch (error) {
       const message = t('model.switchFailed', {
         message: error instanceof Error ? error.message : tc('feedback.requestFailed'),
@@ -121,10 +121,11 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
           });
           const key = `${item.group.providerId}:${item.model}`;
           const busy = saving === key;
+          const label = item.group.labels?.[item.model] ?? item.model;
           return (
             <Interactive
               accessibilityRole="button"
-              accessibilityLabel={item.model}
+              accessibilityLabel={label === item.model ? label : `${label} · ${item.model}`}
               {...a11yState({ selected: active, disabled: saving !== null })}
               disabled={saving !== null}
               onPress={() => void choose(item.group, item.model)}
@@ -140,12 +141,12 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
                 },
               ]}
             >
-              <Text
-                style={[styles.modelName, { color: active ? colors.primary : colors.text }]}
-                numberOfLines={1}
-              >
-                {item.model}
-              </Text>
+              <View style={styles.modelLabel}>
+                <Text style={[styles.modelName, { color: active ? colors.primary : colors.text }]} numberOfLines={1}>
+                  {label}
+                </Text>
+                {label !== item.model ? <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs }} numberOfLines={1}>{item.model}</Text> : null}
+              </View>
               {busy ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : active ? (
@@ -211,7 +212,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.xs,
   },
-  modelName: { flex: 1, fontSize: FontSize.md, fontWeight: '500' },
+  modelLabel: { flex: 1, minWidth: 0 },
+  modelName: { fontSize: FontSize.md, fontWeight: '500' },
   empty: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.xxl },
   emptyTitle: { fontSize: FontSize.md, fontWeight: '600' },
   emptyHint: { fontSize: FontSize.sm, textAlign: 'center', lineHeight: 20 },

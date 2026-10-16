@@ -7,6 +7,7 @@ import enConnect from './locales/en-US/connect.json';
 import enCustomerService from './locales/en-US/customerService.json';
 import enFs from './locales/en-US/fs.json';
 import enModels from './locales/en-US/models.json';
+import enModelGateway from './locales/en-US/modelGateway.json';
 import enNotifications from './locales/en-US/notifications.json';
 import enProject from './locales/en-US/project.json';
 import enRequirements from './locales/en-US/requirements.json';
@@ -20,6 +21,7 @@ import zhConnect from './locales/zh-CN/connect.json';
 import zhCustomerService from './locales/zh-CN/customerService.json';
 import zhFs from './locales/zh-CN/fs.json';
 import zhModels from './locales/zh-CN/models.json';
+import zhModelGateway from './locales/zh-CN/modelGateway.json';
 import zhNotifications from './locales/zh-CN/notifications.json';
 import zhProject from './locales/zh-CN/project.json';
 import zhRequirements from './locales/zh-CN/requirements.json';
@@ -36,6 +38,7 @@ export const NAMESPACES = [
   'requirements',
   'companions',
   'models',
+  'modelGateway',
   'customerService',
   'settings',
   'notifications',
@@ -54,6 +57,7 @@ void i18n.use(initReactI18next).init({
       requirements: zhRequirements,
       companions: zhCompanions,
       models: zhModels,
+      modelGateway: zhModelGateway,
       customerService: zhCustomerService,
       settings: zhSettings,
       notifications: zhNotifications,
@@ -69,6 +73,7 @@ void i18n.use(initReactI18next).init({
       requirements: enRequirements,
       companions: enCompanions,
       models: enModels,
+      modelGateway: enModelGateway,
       customerService: enCustomerService,
       settings: enSettings,
       notifications: enNotifications,

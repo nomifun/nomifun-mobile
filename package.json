@@ -59,6 +59,8 @@
     "check": "bun run typecheck && bun test && bun run check:i18n",
     "e2e": "node e2e/smoke.mjs",
     "e2e:project": "node e2e/project-session.mjs",
+    "e2e:models": "bun e2e/models-contract.mts",
+    "typecheck:e2e-models": "tsc -p e2e/tsconfig.models-contract.json",
     "lint": "expo lint",
     "export:web": "expo export -p web",
     "voice:web:export": "bun scripts/voice-web-export.mjs",

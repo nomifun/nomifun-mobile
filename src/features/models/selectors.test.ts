@@ -15,7 +15,7 @@ const capability = (
 ) => ({
   task,
   traits,
-  protocol: 'test.protocol',
+  protocol: 'openai.chat_text',
   connection_role: 'default',
   allow_cross_origin_credentials: false,
   provider_params: {},
@@ -42,7 +42,7 @@ const provider = (
 });
 
 describe('runtime model selectors', () => {
-  test('matches the task and required traits on one capability', () => {
+  test('matches adapter input support on the requested task, independent of catalog metadata', () => {
     const chatWithVision = {
       provider_id: 'p',
       model: 'vision-chat',
@@ -55,18 +55,19 @@ describe('runtime model selectors', () => {
     const chatWithoutVision = {
       ...chatWithVision,
       model: 'plain-chat',
-      capabilities: [capability('chat')],
+      capabilities: [{ ...capability('chat'), protocol: 'unknown.adapter' }],
     };
     const mixedTasks = {
       ...chatWithVision,
       model: 'mixed',
       capabilities: [
-        capability('chat'),
+        { ...capability('chat'), protocol: 'unknown.adapter' },
         capability('image_generation', ['vision_input']),
       ],
     };
 
     expect(modelSupportsTask(chatWithVision, 'chat', ['vision_input'])).toBe(true);
+    expect(modelSupportsTask({ ...chatWithVision, capabilities: [capability('chat')] }, 'chat', ['vision_input'])).toBe(true);
     expect(modelSupportsTask(chatWithoutVision, 'chat', ['vision_input'])).toBe(false);
     expect(modelSupportsTask(mixedTasks, 'chat', ['vision_input'])).toBe(false);
   });
@@ -143,7 +144,7 @@ describe('runtime model selectors', () => {
             model: 'm',
             enabled: true,
             sort_order: 0,
-            capabilities: [capability('chat', ['reasoning'])],
+            capabilities: [capability('chat', ['web_search'])],
             created_at: 0,
             updated_at: 0,
           },
@@ -152,8 +153,8 @@ describe('runtime model selectors', () => {
     ];
     const ref = { provider_id: 'p', model: 'm' };
 
-    expect(isUsableModelRef(providers, ref, 'chat', ['reasoning'])).toBe(true);
-    expect(isUsableModelRef(providers, ref, 'chat', ['vision_input'])).toBe(false);
+    expect(isUsableModelRef(providers, ref, 'chat', ['vision_input'])).toBe(true);
+    expect(isUsableModelRef(providers, ref, 'chat', ['web_search'])).toBe(false);
     expect(isUsableModelRef(providers, ref, 'image_generation')).toBe(false);
     expect(isUsableModelRef(providers, { provider_id: 'missing', model: 'm' }, 'chat')).toBe(false);
     expect(
@@ -170,5 +171,24 @@ describe('runtime model selectors', () => {
         'chat',
       ),
     ).toBe(false);
+  });
+
+  test('technical capabilities stay optimistic until the runtime records negative evidence', () => {
+    const model = {
+      provider_id: 'p', model: 'm', enabled: true, sort_order: 0,
+      capabilities: [capability('chat')], created_at: 0, updated_at: 0,
+    };
+    expect(modelSupportsTask(model, 'chat', [], ['function_calling'])).toBe(true);
+    const rejected = {
+      ...model,
+      capabilities: [{ ...capability('chat'), health: {
+        status: 'unhealthy' as const,
+        unsupported_technical_capabilities: ['function_calling' as const],
+      } }],
+    };
+    expect(modelSupportsTask(rejected, 'chat', [], ['function_calling'])).toBe(false);
+    expect(modelSupportsTask(rejected, 'chat', [], ['streaming'])).toBe(true);
+    expect(usableModelRefs([provider('p', { models: [rejected, { ...model, model: 'ready' }] })], 'chat', [], ['function_calling']))
+      .toEqual([{ provider_id: 'p', model: 'ready' }]);
   });
 });

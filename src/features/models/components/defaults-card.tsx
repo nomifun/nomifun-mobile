@@ -13,6 +13,7 @@ import type {
   ProviderResponse,
 } from '@/features/models/types';
 import { a11yState } from '@/utils/a11y';
+import { modelRefLabel } from '../presentation';
 
 interface DefaultsCardProps {
   defaults: ClientDefaults | undefined;
@@ -49,7 +50,7 @@ export function DefaultsCard({
         ? t('list.managedName')
         : provider.name || provider.platform
       : t('defaults.unknownProvider');
-    return `${providerName} · ${ref.model}`;
+    return `${providerName} · ${modelRefLabel(providers, ref)}`;
   };
 
   const chat = label(defaults?.chat);

@@ -122,4 +122,14 @@ describe('buildModelGroups', () => {
     ]);
     expect(groups[0]?.providerName).toBe('p-x');
   });
+
+  test('shows friendly aliases while selecting with the original model id', () => {
+    const catalog = [{ provider_id: 'p', name: 'Provider', models: [{ model: 'ep-opaque', display_name: 'Friendly' }] }];
+    const ref = { provider_id: 'p', model: 'ep-opaque' };
+    const groups = buildModelGroups([ref], catalog);
+    expect(groups[0]?.models).toEqual(['ep-opaque']);
+    expect(groups[0]?.labels?.['ep-opaque']).toBe('Friendly');
+    expect(modelLabel(conv({ model: ref }), catalog)).toBe('Friendly');
+    expect(isSameModel(ref, { providerId: groups[0]!.providerId, model: groups[0]!.models[0]! })).toBe(true);
+  });
 });

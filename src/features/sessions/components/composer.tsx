@@ -26,6 +26,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Interactive } from '@/components/ui/interactive';
 import { toast } from '@/components/ui/toast';
 import { MAX_ATTACHMENTS } from '@/features/fs/upload';
+import { useProviders } from '@/features/models/hooks';
 import { useTheme } from '@/hooks/use-theme';
 import { shouldSubmitOnEnter } from '@/utils/keyboard';
 
@@ -113,7 +114,8 @@ export function Composer({
   const blocked = nothingToSend || !canSend || uploading;
 
   const canSwitchModel = supportsModelSwitch(conversation);
-  const currentModel = modelLabel(conversation);
+  const { providers } = useProviders('selector');
+  const currentModel = modelLabel(conversation, providers);
 
   const submit = async () => {
     if (busy || streaming || blocked) return;

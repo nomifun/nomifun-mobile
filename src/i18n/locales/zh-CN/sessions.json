@@ -78,6 +78,13 @@
     "noticeWarning": "警告",
     "noticeSuccess": "完成",
     "noticeInfo": "提示",
+    "inputRequired": "等待你的补充",
+    "remainingWork": "后续工作",
+    "outcome": {
+      "cancelled": "这轮回复已取消，已显示的内容可能不完整。",
+      "paused": "这轮执行已暂停，请在桌面端处理后继续。",
+      "unavailable": "这轮已结束，但没有可确认的最终答复。请重新打开会话查看，或发送消息继续。"
+    },
     "continue": "重新发送",
     "continueStarted": "已重新发送",
     "continueFailed": "重新发送失败，请稍后重试",
@@ -91,6 +98,7 @@
     "stop": "停止",
     "sendFailed": "发送失败：{{message}}",
     "stopFailed": "停止失败：{{message}}",
+    "turnIdentityUnavailable": "正在同步这轮回复，请稍后再试。",
     "stopRequested": "已请求停止"
   },
   "attachments": {

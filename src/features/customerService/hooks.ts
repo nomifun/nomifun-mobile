@@ -14,6 +14,7 @@ import { useCallback, useMemo } from 'react';
 import useSWR, { useSWRConfig, type SWRConfiguration } from 'swr';
 
 import { useProviders as useModelProviders } from '@/features/models/hooks';
+import { modelRefLabel } from '@/features/models/presentation';
 
 import * as csApi from './api';
 import { buildTaskModelGroups, mergeAgent, selectCsChannelBots } from './normalize';
@@ -218,6 +219,7 @@ export interface ChatModelsResult {
   refresh: () => Promise<unknown>;
   providerName: (providerId: string | null) => string | undefined;
   modelsOf: (providerId: string | null) => string[];
+  modelLabel: (providerId: string | null, model: string) => string;
 }
 
 /**
@@ -281,6 +283,7 @@ export function useChatModels(): ChatModelsResult {
     refresh,
     providerName,
     modelsOf,
+    modelLabel: (providerId, model) => modelRefLabel(providers, { provider_id: providerId ?? undefined, model }) ?? model,
   };
 }
 

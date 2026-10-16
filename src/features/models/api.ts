@@ -22,6 +22,7 @@ import type {
   ProviderConnectionResponse,
   ProviderHealthCheckResponse,
   ProviderModelKey,
+  ProviderModelInput,
   ProviderModelResponse,
   ProviderResponse,
   SaveProviderConnectionBody,
@@ -30,7 +31,10 @@ import type {
   TextToSpeechConfig,
   UpdateProviderBody,
 } from './types';
-import { capabilityInputFromResponse as capabilityInputFromAdvancedResponse } from './advanced';
+import { bedrockInput, capabilityInput, connectionInput, modelInput } from './wire';
+import { createModelProtocolApi } from './protocol-api';
+
+export const { discoverModelProtocols, discoverProviderModelProtocols, modelGateway } = createModelProtocolApi(api);
 
 export const PROVIDERS_KEY = '/api/providers';
 export const CLIENT_SETTINGS_KEY = '/api/settings/client';
@@ -67,12 +71,13 @@ export function createProvider(body: CreateProviderBody): Promise<ProviderRespon
     base_url: body.base_url,
     auth_scheme: body.auth_scheme,
     credentials: body.credentials,
-    initial_model: body.initial_model,
+    initial_model: modelInput(body.initial_model),
   };
+  if (body.provider_id !== undefined) payload.provider_id = body.provider_id;
   if (body.enabled !== undefined) payload.enabled = body.enabled;
-  if (body.bedrock_config !== undefined) payload.bedrock_config = body.bedrock_config;
+  if (body.bedrock_config !== undefined) payload.bedrock_config = bedrockInput(body.bedrock_config);
   if (body.sort_order !== undefined) payload.sort_order = body.sort_order;
-  if (body.connections !== undefined) payload.connections = body.connections;
+  if (body.connections !== undefined) payload.connections = body.connections.map(connectionInput);
   return api<ProviderResponse>(PROVIDERS_KEY, { body: payload });
 }
 
@@ -86,7 +91,7 @@ export function updateProvider(
   if (patch.auth_scheme !== undefined) payload.auth_scheme = patch.auth_scheme;
   if (patch.credentials !== undefined) payload.credentials = patch.credentials;
   if (patch.enabled !== undefined) payload.enabled = patch.enabled;
-  if (patch.bedrock_config !== undefined) payload.bedrock_config = patch.bedrock_config;
+  if (patch.bedrock_config !== undefined) payload.bedrock_config = bedrockInput(patch.bedrock_config);
   if (patch.sort_order !== undefined) payload.sort_order = patch.sort_order;
   return api<ProviderResponse>(`${PROVIDERS_KEY}/${encodeURIComponent(providerId)}`, {
     method: 'PUT',
@@ -126,7 +131,7 @@ export function fetchModelsAnonymous(input: FetchModelsAnonymousBody): Promise<F
     credentials: input.credentials,
     try_fix: input.try_fix ?? false,
   };
-  if (input.bedrock_config !== undefined) body.bedrock_config = input.bedrock_config;
+  if (input.bedrock_config !== undefined) body.bedrock_config = bedrockInput(input.bedrock_config);
   return api<FetchModelsResponse>(`${PROVIDERS_KEY}/fetch-models`, {
     body,
     timeoutMs: 20_000,
@@ -147,20 +152,14 @@ export function saveProviderModel(body: SaveProviderModelBody): Promise<Provider
     method: 'PUT',
     body: {
       provider_id: body.provider_id,
-      model: body.model,
+      model: modelInput(body.model),
     },
   });
 }
 
 export function createProviderModel(
   providerId: string,
-  model: {
-    model: string;
-    enabled?: boolean;
-    description?: string;
-    sort_order?: number;
-    capabilities: SaveProviderModelBody['model']['capabilities'];
-  },
+  model: ProviderModelInput,
 ): Promise<ProviderModelResponse> {
   return saveProviderModel({ provider_id: providerId, model });
 }
@@ -174,13 +173,14 @@ export function setProviderModelEnabled(
     provider_id: providerId,
     model: {
       model: row.model,
+      display_name: row.display_name ?? null,
       enabled,
       // PUT is a full model replacement. An omitted description would clear
       // the server row just as an explicit null does, so preserve the current
       // value deliberately.
       description: row.description ?? null,
       sort_order: row.sort_order,
-      capabilities: row.capabilities.map(capabilityInputFromAdvancedResponse),
+      capabilities: row.capabilities.map(capabilityInput),
     },
   });
 }

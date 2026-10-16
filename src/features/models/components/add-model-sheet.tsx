@@ -110,7 +110,7 @@ export function AddModelSheet({
 
   const known = new Set([...existing, ...added]);
   const filtered = (catalog ?? []).filter((m) =>
-    query.trim() ? m.id.toLowerCase().includes(query.trim().toLowerCase()) : true,
+    query.trim() ? `${m.id} ${m.name ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()) : true,
   );
   const visibleModels = filtered.slice(0, MAX_VISIBLE_MODELS);
 
@@ -190,7 +190,7 @@ export function AddModelSheet({
                     color={isKnown ? colors.success : colors.primary}
                   />
                   <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
-                    {item.id}
+                    {item.name || item.id}{item.name && item.name !== item.id ? ` · ${item.id}` : ''}
                   </Text>
                   {isKnown ? (
                     <Text style={[styles.hint, { color: colors.textTertiary }]}>
@@ -225,6 +225,10 @@ export function AddModelSheet({
                 label: selectedSuggestion.name ?? selectedSuggestion.id,
                 tasks: selectedSuggestion.tasks ?? [],
                 traits: selectedSuggestion.traits ?? [],
+                tasksSource: selectedSuggestion.tasks_source,
+                outputLimit: selectedSuggestion.output_limit,
+                contextLimitKind: selectedSuggestion.token_limit_sources?.context_limit_kind,
+                tokenLimitSources: selectedSuggestion.token_limit_sources,
                 ...(selectedSuggestion.context_limit === undefined
                   ? {}
                   : { contextLimit: selectedSuggestion.context_limit }),

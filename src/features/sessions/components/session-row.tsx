@@ -7,6 +7,8 @@ import { IconBadge, IconButton } from '@/components/ui';
 import { InboxRow } from '@/components/codevisual/inbox-row';
 import { FontSize } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useProviders } from '@/features/models/hooks';
+import { modelRefLabel } from '@/features/models/presentation';
 
 import type { Conversation } from '../api';
 import { relativeTime } from '../time';
@@ -20,10 +22,10 @@ interface SessionRowProps {
 }
 
 /** Model / platform hint shown under the session name. */
-function modelLabel(conversation: Conversation, fallback: string): string {
+function modelLabel(conversation: Conversation, fallback: string, providers: Parameters<typeof modelRefLabel>[0]): string {
   const model = conversation.model;
   const name = model?.use_model || model?.model;
-  const label = name || fallback;
+  const label = conversation.type === 'nomi' ? modelRefLabel(providers, model) || fallback : name || fallback;
   return conversation.type && conversation.type !== 'nomi'
     ? `${conversation.type} · ${label}`
     : label;
@@ -38,6 +40,7 @@ export const SessionRow = memo(function SessionRow({
   const { colors } = useTheme();
   const { t } = useTranslation('sessions');
   const { t: tc } = useTranslation('common');
+  const { providers } = useProviders('selector');
 
   const name = conversation.name?.trim() || t('list.untitled');
   const isCompanion = isCompanionConversation(conversation);
@@ -52,7 +55,7 @@ export const SessionRow = memo(function SessionRow({
     <InboxRow
       title={name}
       pinned={conversation.pinned === true}
-      subtitle={modelLabel(conversation, t('meta.defaultModel'))}
+      subtitle={modelLabel(conversation, t('meta.defaultModel'), providers)}
       avatar={
         <View
           accessible

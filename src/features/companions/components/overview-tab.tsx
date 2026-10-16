@@ -13,6 +13,8 @@ import { Button, Card, SectionTitle, Tag, toast } from '@/components/ui';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useProviders } from '@/features/models/hooks';
+import { providerModelRefLabel } from '@/features/models/presentation';
 
 import { ensureCompanionThread, runLearnPass } from '../api';
 import { useCompanionExtras } from '../hooks';
@@ -23,7 +25,6 @@ import {
   ROBOT_PHASE_TONES,
   characterOf,
   formatIsoTime,
-  modelLabel,
   moodOf,
   robotPhaseOf,
 } from '../utils';
@@ -47,6 +48,8 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('companions');
+  const { providers } = useProviders('selector');
+  const modelLabel = (ref: Parameters<typeof providerModelRefLabel>[1]) => providerModelRefLabel(providers, ref);
 
   const companionId = companion.companion_id;
   const status = companion.status;

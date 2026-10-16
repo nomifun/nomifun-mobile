@@ -12,6 +12,7 @@ import { isManagedProvider } from '@/features/models/platforms';
 import { modelSupportsTask, orderSelectorProviders } from '@/features/models/selectors';
 import type { ModelRef, ModelTask, ModelTrait, ProviderResponse } from '@/features/models/types';
 import { a11yState } from '@/utils/a11y';
+import { modelRefLabel } from '../presentation';
 
 interface ModelPickerSheetProps {
   visible: boolean;
@@ -122,7 +123,7 @@ export function ModelPickerSheet({
         <View style={[styles.row, { borderColor: colors.border, opacity: 0.6 }]}>
           <Ionicons name="close-circle-outline" size={20} color={colors.textTertiary} />
           <Text style={[styles.model, { color: colors.textSecondary }]} numberOfLines={1}>
-            {current.model}
+            {modelRefLabel(providers, current)}
           </Text>
           <Tag tone="warning">{t('defaults.unavailableTag')}</Tag>
         </View>
@@ -165,7 +166,8 @@ export function ModelPickerSheet({
                   color={active ? colors.primary : colors.textTertiary}
                 />
                 <Text style={[styles.model, { color: colors.text }]} numberOfLines={1}>
-                  {model}
+                  {modelRefLabel(providers, { provider_id: providerId, model })}
+                  {modelRefLabel(providers, { provider_id: providerId, model }) !== model ? ` · ${model}` : ''}
                 </Text>
               </Pressable>
             );

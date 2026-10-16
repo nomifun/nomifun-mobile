@@ -12,6 +12,7 @@
  * stale binding stays visible instead of silently reading as "no model".
  */
 import { isManagedProvider } from '@/features/models/platforms';
+import { modelDisplayLabel, modelRefLabel } from '@/features/models/presentation';
 
 import type { Conversation, WireModel } from './api';
 
@@ -28,6 +29,7 @@ export interface ModelGroup {
   providerName: string;
   managed: boolean;
   models: string[];
+  labels?: Record<string, string>;
 }
 
 /** Only nomi rows accept `{model}`; everything else hides the affordance. */
@@ -44,8 +46,11 @@ export function currentModelRef(conversation: Conversation | undefined): WireMod
 }
 
 /** Label for the chip: the bare model name, which is what users recognise. */
-export function modelLabel(conversation: Conversation | undefined): string | undefined {
-  return currentModelRef(conversation)?.model;
+export function modelLabel(
+  conversation: Conversation | undefined,
+  providers?: Parameters<typeof modelRefLabel>[0],
+): string | undefined {
+  return modelRefLabel(providers, currentModelRef(conversation));
 }
 
 export function isSameModel(a: WireModel | undefined, b: { providerId: string; model: string }) {
@@ -59,7 +64,10 @@ export function isSameModel(a: WireModel | undefined, b: { providerId: string; m
  */
 export function buildModelGroups(
   candidates: readonly { provider_id?: string; model?: string }[] | undefined,
-  providers: readonly { provider_id: string; name?: string; platform?: string }[] | undefined,
+  providers: readonly {
+    provider_id: string; name?: string; platform?: string;
+    models?: readonly { model: string; display_name?: string }[];
+  }[] | undefined,
   current?: WireModel,
 ): ModelGroup[] {
   const byProvider = new Map<string, string[]>();
@@ -87,6 +95,9 @@ export function buildModelGroups(
       providerName: provider.name?.trim() || provider.provider_id,
       managed: isManagedProvider(provider.platform ?? ''),
       models,
+      labels: Object.fromEntries(models.map((model) => [model,
+        modelDisplayLabel(model, provider.models?.find((row) => row.model === model)?.display_name),
+      ])),
     });
   }
   // A provider the list call did not return (deleted, or not yet loaded) still

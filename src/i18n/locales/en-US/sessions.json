@@ -78,6 +78,13 @@
     "noticeWarning": "Warning",
     "noticeSuccess": "Done",
     "noticeInfo": "Notice",
+    "inputRequired": "Waiting for your input",
+    "remainingWork": "Remaining work",
+    "outcome": {
+      "cancelled": "This reply was canceled. The visible content may be incomplete.",
+      "paused": "Execution is paused. Resolve it on Desktop to continue.",
+      "unavailable": "This turn ended without a verifiable final reply. Reopen the conversation to check, or send a message to continue."
+    },
     "continue": "Resend",
     "continueStarted": "Resent",
     "continueFailed": "Could not resend this message. Try again later.",
@@ -91,6 +98,7 @@
     "stop": "Stop",
     "sendFailed": "Send failed: {{message}}",
     "stopFailed": "Stop failed: {{message}}",
+    "turnIdentityUnavailable": "Syncing this reply. Please try again shortly.",
     "stopRequested": "Stop requested"
   },
   "attachments": {

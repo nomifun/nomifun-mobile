@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Toggle } from '@/components/ui/toggle';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import {
   applyCatalogSuggestionForTask,
   changeCapabilityProtocol,
   changePrimaryModelTask,
+  changeModelDefinitionId,
   effectiveBaseUrl,
   endpointDescriptorValue,
   isProtocolAuthSchemeAllowed,
@@ -19,6 +20,8 @@ import {
   patchCapabilityDraft,
   protocolDescriptorForDraft,
   reconcileCapabilityRecommendations,
+  reconcileModelConfigurationDefaults,
+  modelConfigurationDefaultsFor,
   resolvedCapabilityUrl,
   rootMatchesShape,
   removeCapabilityTask,
@@ -37,7 +40,10 @@ import {
   type ModelTask,
   type ProtocolEndpointDescriptor,
   type ProviderConnectionDescriptor,
+  type ProviderModelCapabilityInput,
 } from '@/features/models/types';
+import { applyDiscoveredCapability, type ModelProtocolDiscoveryContext } from '../protocol-discovery';
+import { ModelProtocolDiscoveryControl } from './model-protocol-discovery-control';
 import { useTheme } from '@/hooks/use-theme';
 import { a11yState } from '@/utils/a11y';
 
@@ -66,6 +72,8 @@ export interface ModelDefinitionEditorProps {
    * Advanced protocol/endpoint controls remain available on demand.
    */
   simpleMode?: boolean;
+  discoveryContext?: ModelProtocolDiscoveryContext;
+  onDiscoveryPendingChange?: (pending: boolean) => void;
 }
 
 const endpointKey = (
@@ -136,6 +144,8 @@ export function ModelDefinitionEditor({
   connections = [],
   onRequestConnection,
   simpleMode = false,
+  discoveryContext,
+  onDiscoveryPendingChange,
 }: ModelDefinitionEditorProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
@@ -143,6 +153,7 @@ export function ModelDefinitionEditor({
   const [expandedTask, setExpandedTask] = useState<ModelTask | null>(null);
   const [advancedTask, setAdvancedTask] = useState<ModelTask | null>(null);
   const controlsDisabled = disabled || validationPending;
+  const pendingDiscoveryTasks = useRef(new Set<ModelTask>());
 
   const selectedTasks = useMemo(
     () => value.capabilities.map((capability) => capability.task),
@@ -168,16 +179,17 @@ export function ModelDefinitionEditor({
   }, [manifestLoadingTasks, manifests]);
   useEffect(() => {
     onChange((current) => {
-      const reconciledCapabilities = reconcileCapabilityRecommendations(
+      const recommendations = reconcileCapabilityRecommendations(
         current.capabilities,
         readyRecommendationManifests,
       );
+      const reconciledCapabilities = reconcileModelConfigurationDefaults(recommendations, readyRecommendationManifests, current.model);
       const changed = reconciledCapabilities.some(
         (capability, index) => capability !== current.capabilities[index],
       );
       return changed ? { ...current, capabilities: reconciledCapabilities } : current;
     });
-  }, [onChange, readyRecommendationManifests]);
+  }, [onChange, readyRecommendationManifests, value.model]);
 
   const updateCapability = (task: ModelTask, patch: Partial<ModelCapabilityDraft>) => {
     onChange((current) => ({
@@ -255,11 +267,15 @@ export function ModelDefinitionEditor({
         label={t('editor.modelId')}
         value={value.model}
         editable={!modelReadOnly && !disabled}
-        onChangeText={(model) => onChange((current) => ({ ...current, model }))}
+        onChangeText={(model) => onChange((current) => changeModelDefinitionId(current, model))}
         placeholder={modelReadOnly ? undefined : t('editor.modelPlaceholder')}
         error={duplicateModel ? t('editor.duplicateModel') : undefined}
         hint={!modelReadOnly ? t('editor.catalogHint') : t('editor.modelReadOnly')}
       />
+
+      <TextField label={t('editor.displayName')} value={value.displayName ?? ''}
+        editable={!disabled} onChangeText={(displayName) => onChange((current) => ({ ...current, displayName }))}
+        hint={t('editor.displayNameHint')} />
 
       <TextField
         label={t('editor.description')}
@@ -336,6 +352,13 @@ export function ModelDefinitionEditor({
                     {suggestion.model}
                   </Text>
                 ) : null}
+                {suggestion.contextLimit !== undefined || suggestion.outputLimit !== undefined ? <Text
+                  style={[styles.catalogId, { color: colors.textTertiary }]}>
+                  {t('editor.catalogLimits', { contextTokens: suggestion.contextLimit ?? '—', output: suggestion.outputLimit ?? '—' })}
+                </Text> : null}
+                {suggestion.tokenLimitSources ? <Text style={[styles.catalogId, { color: colors.textTertiary }]}>
+                  {[suggestion.tokenLimitSources.context_limit, suggestion.tokenLimitSources.output_limit].filter(Boolean).join(' · ')}
+                </Text> : null}
               </View>
             </Pressable>
           ))}
@@ -346,6 +369,14 @@ export function ModelDefinitionEditor({
         <CapabilityCard
           key={capability.task}
           capability={capability}
+          model={value.model}
+          discoveryContext={discoveryContext}
+          onApplyDiscovery={(snapshot, selected, selectionSource) => onChange((current) => applyDiscoveredCapability(current, snapshot, selected, selectionSource))}
+          onDiscoveryPendingChange={(pending) => {
+            if (pending) pendingDiscoveryTasks.current.add(capability.task);
+            else pendingDiscoveryTasks.current.delete(capability.task);
+            onDiscoveryPendingChange?.(pendingDiscoveryTasks.current.size > 0);
+          }}
           expanded={
             expandedTask === capability.task ||
             (!simpleMode && index === 0 && expandedTask === null)
@@ -419,6 +450,10 @@ export function ModelDefinitionEditor({
 
 function CapabilityCard({
   capability,
+  model,
+  discoveryContext,
+  onApplyDiscovery,
+  onDiscoveryPendingChange,
   expanded,
   simpleMode,
   advancedOpen,
@@ -440,6 +475,10 @@ function CapabilityCard({
   t,
 }: {
   capability: ModelCapabilityDraft;
+  model: string;
+  discoveryContext?: ModelProtocolDiscoveryContext;
+  onApplyDiscovery: (snapshot: string, selected: ProviderModelCapabilityInput, selectionSource: 'automatic' | 'manual') => void;
+  onDiscoveryPendingChange: (pending: boolean) => void;
   expanded: boolean;
   simpleMode: boolean;
   advancedOpen: boolean;
@@ -463,6 +502,7 @@ function CapabilityCard({
   const { colors } = useTheme();
   const { t: tc } = useTranslation('common');
   const descriptor = protocolDescriptorForDraft(capability, manifest);
+  const modelDefaults = modelConfigurationDefaultsFor(manifest, model, capability.protocol);
   const effectiveUrl = effectiveBaseUrl(capability, manifest, providerBaseUrl, connections);
   const role = capability.connectionRole.trim() || 'default';
   const roleExists =
@@ -563,6 +603,15 @@ function CapabilityCard({
           color={colors.textTertiary}
         />
       </Pressable>
+
+      {discoveryContext ? <ModelProtocolDiscoveryControl model={model} capability={capability}
+        context={discoveryContext} disabled={disabled || loading || validationPending}
+        onApply={onApplyDiscovery} onPendingChange={onDiscoveryPendingChange} /> : null}
+
+      {modelDefaults ? <View style={styles.compactBody}>
+        <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('editor.documentedDefaults', { date: modelDefaults.checked_at })}</Text>
+        {modelDefaults.sources.map((source) => <Text key={source} selectable style={[styles.hint, { color: colors.textTertiary }]}>{source}</Text>)}
+      </View> : null}
 
       {simpleMode && !advancedOpen ? (
         <View style={[styles.compactBody, { borderTopColor: colors.border }]}>
@@ -756,7 +805,7 @@ function CapabilityCard({
             );
           })}
 
-          <Text style={[styles.subLabel, { color: colors.textSecondary }]}>
+          {capability.task === 'chat' ? <><Text style={[styles.subLabel, { color: colors.textSecondary }]}>
             {t('editor.traits')}
           </Text>
           <View style={styles.chips}>
@@ -797,35 +846,37 @@ function CapabilityCard({
               );
             })}
           </View>
+          </> : null}
 
           <TextField
             label={t('editor.contextLimit')}
-            value={capability.contextLimit ? String(capability.contextLimit) : ''}
+            value={capability.contextLimit === undefined ? '' : String(capability.contextLimit)}
             editable={!disabled}
             onChangeText={(raw) => {
               const parsed = Number(raw);
               onChange({
                 contextLimit:
-                  raw.trim() && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                  raw.trim() ? parsed : undefined,
               });
             }}
             keyboardType="numeric"
+            hint={t('editor.limitHint')}
           />
-          {descriptor?.requires_output_ceiling === true || capability.outputLimit !== undefined ? (
+          {(
             <TextField
               label={t('editor.outputLimit')}
-              value={capability.outputLimit ? String(capability.outputLimit) : ''}
+              value={capability.outputLimit === undefined ? '' : String(capability.outputLimit)}
               editable={!disabled}
               onChangeText={(raw) => {
                 const parsed = Number(raw);
                 onChange({
                   outputLimit:
-                    raw.trim() && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                    raw.trim() ? parsed : undefined,
                 });
               }}
               keyboardType="numeric"
               hint={
-                descriptor?.requires_output_ceiling ? t('editor.outputLimitRequired') : undefined
+                descriptor?.requires_output_ceiling ? t('editor.outputLimitRequired') : t('editor.limitHint')
               }
               error={
                 validationErrors.some((error) => error.code === 'output_ceiling_required')
@@ -833,7 +884,11 @@ function CapabilityCard({
                   : undefined
               }
             />
-          ) : null}
+          )}
+          {capability.task === 'chat' ? <TextField label={t('editor.compactionThreshold')}
+            value={capability.compactionThresholdPct === undefined ? '' : String(capability.compactionThresholdPct)}
+            editable={!disabled} keyboardType="numeric" hint={t('editor.compactionThresholdHint')}
+            onChangeText={(raw) => onChange({ compactionThresholdPct: raw.trim() ? Number(raw) : undefined })} /> : null}
           <TextField
             label={t('editor.providerParams')}
             value={capability.providerParamsJson}
@@ -880,7 +935,7 @@ function CapabilityCard({
           ) : null}
           {validationErrors.length > 0 ? (
             <Text style={[styles.hint, { color: colors.danger }]}>
-              {t('editor.validationSummary')}
+              {[...new Set(validationErrors.map((error) => t(`editor.errors.${error.code}`)))].join('\n')}
             </Text>
           ) : null}
           {canRemove ? (

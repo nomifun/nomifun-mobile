@@ -2,6 +2,8 @@ import type {
   ModelRef,
   ModelTask,
   ModelTrait,
+  ModelTechnicalCapability,
+  ProviderModelCapabilityResponse,
   ProviderResponse,
 } from './types';
 import { isManagedProvider } from './platforms';
@@ -24,18 +26,42 @@ export function orderSelectorProviders<T extends { platform?: string }>(
 /**
  * Return whether a model row is runnable for one exact capability request.
  *
- * A model name is not a capability.  Runtime selection must match the task
- * and every requested trait on the same nested capability object.
+ * Input support follows the configured Chat adapter, just as in desktop's
+ * providerModels helper. Catalog traits describe the model; missing catalog
+ * metadata must not hide an adapter that can encode the requested input.
  */
+export function capabilitySupportsTrait(
+  capability: ProviderModelCapabilityResponse | undefined,
+  trait: ModelTrait,
+): boolean {
+  if (capability?.task !== 'chat') return false;
+  switch (trait) {
+    case 'vision_input':
+      return ['openai.chat_text', 'openai.responses', 'anthropic.messages',
+        'gemini.generate_text', 'bedrock.anthropic_messages',
+        'vertex.anthropic_messages'].includes(capability.protocol);
+    case 'audio_input':
+      return ['openai.chat_text', 'openai.responses', 'gemini.generate_text'].includes(capability.protocol);
+    case 'web_search':
+      return capability.protocol === 'openai.responses';
+    case 'video_input':
+      return false;
+  }
+}
+
 export function modelSupportsTask(
   model: ProviderResponse['models'][number],
   task: ModelTask,
   requiredTraits: readonly ModelTrait[] = [],
+  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
 ): boolean {
   const capability = model.capabilities.find((item) => item.task === task);
   return Boolean(
     capability &&
-      requiredTraits.every((trait) => (capability.traits ?? []).includes(trait)),
+      requiredTraits.every((trait) => capabilitySupportsTrait(capability, trait)) &&
+      requiredTechnicalCapabilities.every(
+        (technical) => !capability.health?.unsupported_technical_capabilities?.includes(technical),
+      ),
   );
 }
 
@@ -45,12 +71,13 @@ export function isUsableModelRef(
   ref: ModelRef | undefined,
   task: ModelTask,
   requiredTraits: readonly ModelTrait[] = [],
+  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
 ): ref is ModelRef {
   if (!ref?.provider_id || !ref.model) return false;
   const provider = providers.find((item) => item.provider_id === ref.provider_id);
   if (!provider || provider.enabled === false) return false;
   const model = provider.models.find((item) => item.model === ref.model);
-  return !!model && model.enabled === true && modelSupportsTask(model, task, requiredTraits);
+  return !!model && model.enabled === true && modelSupportsTask(model, task, requiredTraits, requiredTechnicalCapabilities);
 }
 
 /** Pick the first runnable model in provider/model API order. */
@@ -58,11 +85,12 @@ export function firstUsableModel(
   providers: readonly ProviderResponse[],
   task: ModelTask,
   requiredTraits: readonly ModelTrait[] = [],
+  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
 ): ModelRef | undefined {
   for (const provider of orderSelectorProviders(providers)) {
     if (provider.enabled === false) continue;
     const model = provider.models.find(
-      (item) => item.enabled === true && modelSupportsTask(item, task, requiredTraits),
+      (item) => item.enabled === true && modelSupportsTask(item, task, requiredTraits, requiredTechnicalCapabilities),
     );
     if (model) {
       return { provider_id: provider.provider_id, model: model.model };
@@ -76,12 +104,13 @@ export function usableModelRefs(
   providers: readonly ProviderResponse[],
   task: ModelTask,
   requiredTraits: readonly ModelTrait[] = [],
+  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
 ): ModelRef[] {
   const refs: ModelRef[] = [];
   for (const provider of orderSelectorProviders(providers)) {
     if (provider.enabled === false) continue;
     for (const model of provider.models) {
-      if (model.enabled !== true || !modelSupportsTask(model, task, requiredTraits)) continue;
+      if (model.enabled !== true || !modelSupportsTask(model, task, requiredTraits, requiredTechnicalCapabilities)) continue;
       refs.push({ provider_id: provider.provider_id, model: model.model });
     }
   }

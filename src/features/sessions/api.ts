@@ -123,6 +123,14 @@ export interface TipsContent {
   type?: 'error' | 'success' | 'warning' | string;
   error?: AgentStreamErrorInfo;
   recovery?: TruncatedTurnRecovery;
+  user_input_request?: AgentUserInputRequest;
+}
+
+/** The host's normal handoff question; answering starts an ordinary new turn. */
+export interface AgentUserInputRequest {
+  request_id: string;
+  question: string;
+  remaining_work: string;
 }
 
 export interface AgentStreamErrorInfo {
@@ -462,9 +470,10 @@ export function postMessage(
   }).then(normalizeSendMessageResult);
 }
 
-/** `POST .../turns/cancel` — `{idempotency_key}` stops the active turn. */
-export function cancelTurn(conversationId: string): Promise<unknown> {
+/** Cancel the exact accepted input observed by the user, even if a successor starts. */
+export function cancelTurn(conversationId: string, expectedTurnId: string, expectedEpoch: number): Promise<unknown> {
   return api<unknown>(`${agentSessionPath(conversationId)}/turns/cancel`, {
-    body: { idempotency_key: newIdempotencyKey() },
+    body: { idempotency_key: newIdempotencyKey(), expected_turn_id: expectedTurnId },
+    expectedEpoch,
   });
 }
