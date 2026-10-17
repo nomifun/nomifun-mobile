@@ -1,7 +1,7 @@
 {
   "name": "nomifun-mobile",
   "main": "expo-router/entry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "@expo/vector-icons": "^15.0.2",
