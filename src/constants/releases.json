@@ -1,0 +1,8 @@
+{
+  "schema": "nomifun.mobile.release.v1",
+  "repository": "https://github.com/nomifun/nomifun-mobile",
+  "applicationId": "com.nomifun.mobile",
+  "certificateSha256": "30373110cebf3685ac56cc5e39897101be7f1595a79c90b5457b767f585f5581",
+  "channel": "stable",
+  "distribution": "official-apk"
+}

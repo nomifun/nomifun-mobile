@@ -1,5 +1,10 @@
 {
-  "appearance": { "title": "外观", "system": "跟随系统", "light": "浅色", "dark": "深色" },
+  "appearance": {
+    "title": "外观",
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
+  },
   "server": "服务器",
   "serverAddress": "地址",
   "currentSite": "当前站点",
@@ -12,5 +17,50 @@
   "about": "关于",
   "version": "版本",
   "language": "语言",
-  "poweredBy": "由桌面端 Nomifun 提供服务"
+  "poweredBy": "由桌面端 Nomifun 提供服务",
+  "update": {
+    "title": "版本与更新",
+    "independentHint": "无需连接电脑，即可检查手机 App 的官方版本。",
+    "installedTitle": "当前安装",
+    "unknownVersion": "未知",
+    "build": "构建号",
+    "check": "检查更新",
+    "checkedAt": "上次成功检查：{{time}}",
+    "releaseTitle": "官方稳定版本",
+    "packageSize": "安装包大小",
+    "megabytes": "{{size}} MB",
+    "releaseNotes": "查看发布说明",
+    "officialReleases": "打开官方发布页",
+    "download": "下载新版 APK",
+    "installHint": "将在系统浏览器下载官方 APK。下载后请打开文件，并按系统提示允许安装、确认覆盖升级。安装前请勿卸载 App，以保留连接信息；签名不一致时系统将拒绝覆盖安装。",
+    "staleHint": "这些是此前检查的发布信息。本次检查失败，暂不能据此下载升级，请重试。",
+    "webHint": "网页版随服务部署更新。请在部署完成后刷新页面，以加载新版本。",
+    "iosHint": "当前尚未配置可用的 App Store 或 TestFlight 更新渠道。",
+    "status": {
+      "idle": "尚未检查官方版本。",
+      "checking": "正在检查官方版本…",
+      "available": "发现可升级的官方版本。",
+      "current": "当前已是官方最新版本。",
+      "ahead": "当前安装的构建号高于官方稳定版本，无需降级。"
+    },
+    "unsupported": {
+      "platform": "当前平台不支持 Android APK 更新。",
+      "distribution": "当前安装包未标识为官方 APK 渠道，无法确认是否可覆盖升级。请查看官方发布页。",
+      "package": "当前安装包与官方版本的应用标识不同，无法直接覆盖升级。",
+      "installed-build": "无法读取有效的安装构建号，不能安全判断是否可升级。",
+      "installed-version": "无法读取有效的安装版本，不能安全判断是否可升级。",
+      "android-api": "当前 Android 系统版本未知或不满足新版要求，无法直接升级。",
+      "abi": "当前设备架构未知或不在新版支持范围内，无法直接升级。"
+    },
+    "errors": {
+      "network": "无法连接官方发布服务，请检查网络后重试。检查失败不代表已是最新版本。",
+      "timeout": "检查更新超时，请稍后重试。",
+      "http": "官方发布服务暂不可用，请稍后重试。",
+      "invalid-manifest": "官方发布信息暂不可用，已阻止下载安装，请稍后重试。"
+    },
+    "link": {
+      "opened": "已打开下载页。请在系统浏览器中下载并安装；返回本页后会重新检查当前版本。",
+      "failed": "无法打开系统浏览器，请稍后重试。"
+    }
+  }
 }

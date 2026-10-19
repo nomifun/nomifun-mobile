@@ -25,6 +25,16 @@
       "env": {
         "BUN_INSTALL_CACHE_DIR": "/home/expo/workingdir/build/.bun-cache"
       }
+    },
+    "apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "env": {
+        "NOMIFUN_APP_DISTRIBUTION": "official-apk"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

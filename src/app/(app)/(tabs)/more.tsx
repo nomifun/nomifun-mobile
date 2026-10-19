@@ -4,7 +4,6 @@ import { Toggle } from '@/components/ui/toggle';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { logout } from '@/api/auth';
 import {
@@ -25,6 +24,7 @@ import { useConnection } from '@/hooks/use-connection';
 import { useTheme } from '@/hooks/use-theme';
 import { themeStore } from '@/hooks/theme-store';
 import { useWsStatus } from '@/hooks/use-ws';
+import { getInstalledApp } from '@/features/app-update/installed';
 
 export default function MoreScreen() {
   const { colors, mode } = useTheme();
@@ -33,6 +33,7 @@ export default function MoreScreen() {
   const { t: tc } = useTranslation('connect');
   const connection = useConnection();
   const [notifyOn, setNotifyOn] = useState(notificationService.isEnabled());
+  const installed = getInstalledApp();
 
   const toggleNotifications = async (next: boolean) => {
     const effective = await notificationService.setEnabled(next);
@@ -135,12 +136,15 @@ export default function MoreScreen() {
         <ListRow
           seamless
           title={t('version')}
+          subtitle={t('update.title')}
           left={<IconBadge icon="information-circle-outline" tone="neutral" />}
           right={
             <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
-              {Constants.expoConfig?.version ?? '0.1.0'}
+              {installed.version ?? t('update.unknownVersion')}
             </Text>
           }
+          chevron
+          onPress={() => router.push('/update')}
         />
       </ListGroup>
       <Text style={[styles.powered, { color: colors.textTertiary }]}>{t('poweredBy')}</Text>

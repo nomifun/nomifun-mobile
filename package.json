@@ -8,6 +8,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "dayjs": "^1.11.21",
     "expo": "~57.0.11",
+    "expo-application": "~57.0.2",
     "expo-build-properties": "~57.0.22",
     "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.9",
@@ -67,6 +68,9 @@
     "e2e:voice-web": "node e2e/voice-web.mjs",
     "test:voice-web-server": "node --test scripts/voice-web-server.test.mjs",
     "check:cache-modules": "node scripts/check-cache-module-graph.mjs",
+    "release:manifest": "node scripts/android-release-manifest.mjs",
+    "release:verify": "node scripts/verify-android-release.mjs",
+    "test:release": "node --test scripts/android-release.test.mjs",
     "e2e:sessions": "bun e2e/sessions-contract.mts",
     "typecheck:e2e-sessions": "tsc -p e2e/tsconfig.sessions-contract.json"
   },

@@ -51,7 +51,8 @@ export default function ConnectScreen() {
   const [address, setAddress] = useState(initial.address);
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [submitting, setBusy] = useState(false);
+  const busy = submitting || connection.phase === 'loading';
   const [error, setError] = useState('');
   const [needsSetup, setNeedsSetup] = useState(false);
   const [pasted, setPasted] = useState('');
@@ -263,6 +264,9 @@ export default function ConnectScreen() {
             {isWeb ? t('webSameOrigin') : t('scanHint')}
           </Text>
         </View>
+        <Button icon="download-outline" variant="ghost" onPress={() => router.push('/update')}>
+          {t('update.title', { ns: 'settings' })}
+        </Button>
       </View>
     </Screen>
   );

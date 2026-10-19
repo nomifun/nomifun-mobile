@@ -2,7 +2,6 @@
   "expo": {
     "name": "Nomifun",
     "slug": "nomifun-mobile",
-    "version": "0.1.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": [
@@ -86,8 +85,7 @@
           }
         }
       ],
-      "expo-secure-store",
-      "expo-build-properties"
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -45,8 +45,9 @@ export default function RootLayout() {
   }, [colors, scheme]);
 
   useEffect(() => {
-    if (connection.phase !== 'loading') void SplashScreen.hideAsync();
-  }, [connection.phase]);
+    // Connection hydration must not hide installation recovery/update routes.
+    void SplashScreen.hideAsync();
+  }, []);
 
   const connected = connection.phase === 'connected' && connection.verified;
 
@@ -69,8 +70,6 @@ export default function RootLayout() {
       notificationService.stop();
     }
   }, [connected]);
-
-  if (connection.phase === 'loading') return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -97,6 +96,10 @@ export default function RootLayout() {
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           <View style={{ flex: 1, minHeight: 0 }}>
             <Stack
+              screenLayout={({ children, route }) =>
+                connection.phase === 'loading' && route.name !== 'connect' && route.name !== 'update'
+                  ? <></> : children
+              }
               screenOptions={{
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.text,
@@ -115,6 +118,7 @@ export default function RootLayout() {
               <Stack.Screen name="scan" options={{ title: t('scanQr'), presentation: 'modal' }} />
               <Stack.Screen name="pair" options={{ title: t('scanQr') }} />
               <Stack.Screen name="connections" options={{ title: t('devicesTitle') }} />
+              <Stack.Screen name="update" options={{ title: t('update.title', { ns: 'settings' }) }} />
             </Stack>
           </View>
           {connected && <VoiceDock />}

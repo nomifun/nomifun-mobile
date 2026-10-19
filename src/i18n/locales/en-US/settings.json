@@ -1,5 +1,10 @@
 {
-  "appearance": { "title": "Appearance", "system": "System", "light": "Light", "dark": "Dark" },
+  "appearance": {
+    "title": "Appearance",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
   "server": "Server",
   "serverAddress": "Address",
   "currentSite": "Current site",
@@ -12,5 +17,50 @@
   "about": "About",
   "version": "Version",
   "language": "Language",
-  "poweredBy": "Powered by the Nomifun desktop"
+  "poweredBy": "Powered by the Nomifun desktop",
+  "update": {
+    "title": "Version & updates",
+    "independentHint": "Check official mobile app releases without connecting to a desktop.",
+    "installedTitle": "Installed app",
+    "unknownVersion": "Unknown",
+    "build": "Build number",
+    "check": "Check for updates",
+    "checkedAt": "Last successful check: {{time}}",
+    "releaseTitle": "Official stable release",
+    "packageSize": "Package size",
+    "megabytes": "{{size}} MB",
+    "releaseNotes": "View release notes",
+    "officialReleases": "Open official releases",
+    "download": "Download new APK",
+    "installHint": "The official APK will download in your system browser. Open the file, allow installation if prompted, and confirm the update. Keep the existing app installed to retain connection settings. Android will reject the update if the signing certificates differ.",
+    "staleHint": "This release information is from an earlier check. The latest check failed, so downloading is disabled until you retry.",
+    "webHint": "The web app updates with its deployment. Refresh this page after deployment to load the new version.",
+    "iosHint": "No available App Store or TestFlight update channel is configured yet.",
+    "status": {
+      "idle": "Official releases have not been checked yet.",
+      "checking": "Checking official releases…",
+      "available": "A newer official release is available.",
+      "current": "You have the latest official release.",
+      "ahead": "The installed build is newer than the official stable release. No downgrade is needed."
+    },
+    "unsupported": {
+      "platform": "Android APK updates are unavailable on this platform.",
+      "distribution": "This installation is not marked as an official APK release. Compatibility cannot be confirmed. See the official releases.",
+      "package": "The installed application ID differs from the official release. An in-place update is unavailable.",
+      "installed-build": "A valid installed build number is unavailable, so update compatibility cannot be determined.",
+      "installed-version": "A valid installed version is unavailable, so update compatibility cannot be determined.",
+      "android-api": "Your Android version is unknown or does not meet the new release requirements.",
+      "abi": "Your device architecture is unknown or unsupported by this release."
+    },
+    "errors": {
+      "network": "Unable to reach official releases. Check your network and retry. This does not mean your app is up to date.",
+      "timeout": "The update check timed out. Please retry later.",
+      "http": "Official releases are temporarily unavailable. Please retry later.",
+      "invalid-manifest": "Official release information is unavailable. Downloading is blocked. Please retry later."
+    },
+    "link": {
+      "opened": "The download page is open. Download and install the APK in your system browser. We will check the installed version again when you return.",
+      "failed": "Unable to open your system browser. Please try again."
+    }
+  }
 }
