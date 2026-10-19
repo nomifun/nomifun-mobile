@@ -225,7 +225,7 @@ try {
     const status = await transport.rawRequest<AuthStatusResponse>('/api/auth/status');
     if (!status.is_authenticated || status.needs_setup) {
       const result = await transport.rawRequest<AuthLoginResponse>(status.needs_setup ? '/api/auth/device-setup' : '/api/auth/device-login', {
-        token: '', body: { username, password, device_name: 'Mobile model contract', protocol_version: 1 },
+        token: '', body: { username, password, device_name: 'Mobile model contract', protocol_version: 2, installation_key: '1'.repeat(64) },
       });
       assert.equal(result.success, true); assert.ok(result.token && result.device?.device_id);
       binding = { ...binding, token: result.token, user: result.user ?? null };

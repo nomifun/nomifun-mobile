@@ -35,8 +35,8 @@ const id = 'mobile-model-fixture';
 const providerId = 'fixture-provider';
 const ref = model => ({ provider_id: providerId, model });
 const now = 1_800_000_000_000;
-const desktop = { desktop_id: id, desktop_name: 'Companion UI fixture', protocol_version: 1,
-  min_client_protocol: 1, capabilities: ['agent_session'] };
+const desktop = { desktop_id: id, desktop_name: 'Companion UI fixture', protocol_version: 2,
+  min_client_protocol: 2, capabilities: ['agent_session'] };
 const system = { storage_generation: id, agent_data_generation: 1, platform: 'fixture', arch: 'fixture' };
 const capability = (task, traits = []) => ({ task, traits,
   protocol: task === 'chat' && traits.includes('vision_input') ? 'openai.responses' : `fixture.${task}`,

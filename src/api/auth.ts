@@ -8,6 +8,7 @@
  */
 import { rawRequest } from './client';
 import { connectionStore } from './connection';
+import { deviceIdentityStore } from './device-identity';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { CLIENT_CONNECTION_PROTOCOL, fetchDesktopInfo, verifyConnection } from './connections';
@@ -72,13 +73,28 @@ async function persistLogin(baseUrl: string, res: AuthLoginResponse, desktop: De
 
 const deviceName = () => Array.from((Device.deviceName ?? `Nomifun ${Platform.OS}`).replace(/[\x00-\x1f\x7f]/g, '').trim()).slice(0, 80).join('') || `Nomifun ${Platform.OS}`;
 
-/** One-shot phone ticket creates an individually revocable credential, without a browser cookie. */
+async function prepareDeviceRegistration(desktop: DesktopConnectionInfo, expectedEpoch: number) {
+  if (connectionStore.epoch() !== expectedEpoch) throw new StaleConnectionError();
+  const installation_key = await deviceIdentityStore.getInstallationKey(desktop.desktop_id);
+  if (connectionStore.epoch() !== expectedEpoch) throw new StaleConnectionError();
+  const previous = connectionStore.binding();
+  // A saved device credential can claim its old record on the same Desktop only.
+  // It never replaces the fresh ticket/password authorization or travels to another Desktop.
+  return {
+    installation_key,
+    ...(previous?.desktop?.desktop_id === desktop.desktop_id && previous.device && previous.token
+      ? { previous_device_token: previous.token } : {}),
+  };
+}
+
+/** One-shot phone ticket registers this installation without a browser cookie. */
 export async function devicePairLogin(baseUrl: string, qrToken: string, expectedEpoch: number): Promise<ConnectionAuthResult> {
   const desktop = await fetchDesktopInfo(baseUrl, expectedEpoch);
   if (!desktop.capabilities.includes('device_pairing')) throw new ApiError('Update Desktop to pair a phone', 426, 'CONNECTION_PROTOCOL_INCOMPATIBLE');
+  const registration = await prepareDeviceRegistration(desktop, expectedEpoch);
   const res = await rawRequest<AuthLoginResponse>('/api/auth/device-pair', {
     baseUrl, token: '', method: 'POST', timeoutMs: 10_000, credentials: 'omit',
-    body: { qr_token: qrToken, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL },
+    body: { qr_token: qrToken, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL, ...registration },
     expectedEpoch,
   });
   if (!res.device?.device_id) throw new ApiError('Desktop did not register this device', 426, 'CONNECTION_PROTOCOL_INCOMPATIBLE');
@@ -93,11 +109,12 @@ export async function passwordLogin(
   expectedEpoch: number,
 ): Promise<ConnectionAuthResult> {
   const desktop = await fetchDesktopInfo(baseUrl, expectedEpoch);
+  const registration = await prepareDeviceRegistration(desktop, expectedEpoch);
   const res = await rawRequest<AuthLoginResponse>('/api/auth/device-login', {
     baseUrl,
     token: '',
     method: 'POST',
-    body: { username, password, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL },
+    body: { username, password, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL, ...registration },
     credentials: 'omit',
     timeoutMs: 10_000,
     expectedEpoch,
@@ -113,11 +130,12 @@ export async function setupAdmin(
   expectedEpoch: number,
 ): Promise<ConnectionAuthResult> {
   const desktop = await fetchDesktopInfo(baseUrl, expectedEpoch);
+  const registration = await prepareDeviceRegistration(desktop, expectedEpoch);
   const res = await rawRequest<AuthLoginResponse>('/api/auth/device-setup', {
     baseUrl,
     token: '',
     method: 'POST',
-    body: { username, password, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL },
+    body: { username, password, device_name: deviceName(), protocol_version: CLIENT_CONNECTION_PROTOCOL, ...registration },
     credentials: 'omit',
     timeoutMs: 10_000,
     expectedEpoch,

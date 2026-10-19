@@ -32,6 +32,26 @@ import { api, rawRequest, apiFetcher } from '@/api/client';
   never `id`). Bodies with unknown fields are often rejected
   (`deny_unknown_fields`) — send exactly the documented fields.
 
+## Connection identity
+
+The connection protocol is v2. Every phone pairing, password login and setup
+request carries the independently persisted, Desktop-scoped `installation_key`.
+`src/api/device-identity.ts` owns Keychain/Keystore storage on native and
+a single IndexedDB store on H5; connection metadata, logout and local forget
+actions must not own or delete it. `device-identity-core.ts` merges native
+initialization; `device-identity-indexeddb.ts` uses an atomic read/write
+get-or-create transaction across same-origin tabs. Neither returns an identity
+before its storage commit succeeds. Web has no localStorage or temporary-key
+fallback when IndexedDB is unavailable.
+
+Native randomness uses the existing Expo Core OS UUID v4 generator twice
+(244 random bits); Web uses `crypto.getRandomValues`, including on HTTP LAN
+origins. Missing secure randomness or unreadable storage fails before auth.
+Device names are labels, never identity or deduplication keys. A fresh
+registration rotates the credential while retaining the same installation's
+device ID. An old device token is a claim proof only for the same Desktop;
+never send the active Desktop's token to a different target during login.
+
 ## Session data ownership
 
 `SessionDataProvider` in the authenticated layout owns one `createSessionData`

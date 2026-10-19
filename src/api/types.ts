@@ -71,7 +71,7 @@ export interface AuthStatusResponse {
 export interface ServerBinding {
   /** Absolute origin on native (http://192.168.1.42:25808); '' on web (same-origin). */
   baseUrl: string;
-  /** 30-day JWT from qr-login / password login. */
+  /** Device-scoped JWT from phone pairing or account authentication. */
   token: string;
   user: AuthUser | null;
   desktop?: DesktopConnectionInfo;

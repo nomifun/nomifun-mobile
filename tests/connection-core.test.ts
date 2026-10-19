@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createConnectionStore } from '@/api/connection-core';
 import type { ServerBinding } from '@/api/types';
-const desktop = { desktop_id: 'a', desktop_name: 'A', protocol_version: 1, min_client_protocol: 1, capabilities: ['agent_session'] };
+const desktop = { desktop_id: 'a', desktop_name: 'A', protocol_version: 2, min_client_protocol: 2, capabilities: ['agent_session'] };
 const system = { storage_generation: 'a', agent_data_generation: 3, platform: 'win32', arch: 'x64' };
 const binding: ServerBinding = { baseUrl: 'https://a.test', token: 'token-a', user: { user_id: 'u', username: 'U' }, desktop, system };
 function harness(sameOrigin = false) {

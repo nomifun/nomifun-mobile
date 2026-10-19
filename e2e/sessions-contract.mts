@@ -124,7 +124,7 @@ try {
     if (!status.is_authenticated || status.needs_setup) {
       const login = await transport.rawRequest<AuthLoginResponse>(status.needs_setup ? '/api/auth/device-setup' : '/api/auth/device-login', {
         token: '', body: { username: 'mobile-session-contract', password: 'MobileSession-2026-fixture!',
-          device_name: 'Mobile Session contract', protocol_version: 1 },
+          device_name: 'Mobile Session contract', protocol_version: 2, installation_key: '2'.repeat(64) },
       });
       assert.equal(login.success, true);
       assert.ok(login.token && login.device?.device_id);

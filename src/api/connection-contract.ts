@@ -1,7 +1,7 @@
 import type { DesktopConnectionInfo, DesktopSystemInfo, ServerBinding } from './types';
 import { ApiError } from './types';
 
-export const CLIENT_CONNECTION_PROTOCOL = 1;
+export const CLIENT_CONNECTION_PROTOCOL = 2;
 
 export function isLocalConnectionAddress(baseUrl: string): boolean {
   if (!baseUrl) return true;

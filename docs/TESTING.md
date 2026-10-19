@@ -105,7 +105,7 @@ device acceptance.
 Connection changes have a focused offline gate:
 
 ```sh
-bun test tests/connection-contract.test.ts tests/connection-core.test.ts tests/credential-storage.test.ts tests/transport-client.test.ts tests/pairing.test.ts tests/pairing-intake.test.ts
+bun test tests/connection-contract.test.ts tests/connection-core.test.ts tests/credential-storage.test.ts tests/device-identity.test.ts tests/cron-connection-fence.test.ts tests/transport-client.test.ts tests/pairing.test.ts tests/pairing-intake.test.ts
 bun run typecheck
 bun run check:i18n
 bun run export:web
@@ -117,7 +117,24 @@ agent stack without importing React Native. Cover one-shot device pairing,
 independent revocation (including WebSocket invalidation), an uncertain POST
 with exactly one delivery, and a held response from an old Desktop after the
 active namespace changes. Mocked secure storage failure tests prove pointer
-commit ordering; they do not prove physical Keychain / Keystore behavior.
+commit ordering; installation-identity tests cover Desktop isolation, concurrent
+initialization, restart reuse, secure random sources and rejected storage writes.
+Auth-intent tests cover all three entry points, identity persistence before
+registration, same-Desktop claim proofs and stale epochs. These checks do not
+prove physical Keychain / Keystore behavior.
+
+The Web identity store has a real browser concurrency gate:
+
+```sh
+NOMI_E2E_PLAYWRIGHT=/path/to/runtime-with-node_modules bun run e2e:device-identity
+```
+
+It bundles the production IndexedDB adapter and runs two same-origin browser
+pages with default desktop viewports against a temporary loopback fixture.
+It checks atomic first initialization, reload reuse, Desktop isolation,
+transaction-complete ordering, abort/retry and unavailable storage/randomness.
+No Desktop process, app UI, native device or phone emulation is involved.
+Set `NOMI_E2E_EXECUTABLE_PATH` to reuse an installed browser if needed.
 
 H5 acceptance needs Mobile HTML, `/api/*` and `/ws` on the same origin. Its
 sign-in now registers a separately revocable device through `device-login` /

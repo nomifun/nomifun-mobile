@@ -1,13 +1,14 @@
 import { expect, test } from 'bun:test';
 import { assertDesktopIdentity, connectionNamespace, isLocalConnectionAddress, requireSecureConnectionAddress, validateDesktopInfo, validateSystemInfo } from '@/api/connection-contract';
 
-const desktop = { desktop_id: 'desktop-a', desktop_name: 'Computer A', protocol_version: 1, min_client_protocol: 1, capabilities: ['agent_session', 'realtime', 'device_pairing'] };
+const desktop = { desktop_id: 'desktop-a', desktop_name: 'Computer A', protocol_version: 2, min_client_protocol: 2, capabilities: ['agent_session', 'realtime', 'device_pairing'] };
 const system = { storage_generation: 'generation-a', agent_data_generation: 3, platform: 'win32', arch: 'x64' };
 
 test('compatibility and canonical data identity fail closed', () => {
   expect(validateDesktopInfo(desktop)).toEqual(desktop);
+  expect(() => validateDesktopInfo({ ...desktop, protocol_version: 1, min_client_protocol: 1 })).toThrow();
   expect(validateSystemInfo(system)).toEqual(system);
-  expect(() => validateDesktopInfo({ ...desktop, min_client_protocol: 2 })).toThrow();
+  expect(() => validateDesktopInfo({ ...desktop, min_client_protocol: 3 })).toThrow();
   expect(() => validateDesktopInfo({ ...desktop, desktop_id: '' })).toThrow();
   expect(() => validateSystemInfo({ ...system, storage_generation: 'uninitialized' })).toThrow();
   expect(() => assertDesktopIdentity(desktop, { ...desktop, desktop_id: 'desktop-b' })).toThrow();

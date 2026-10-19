@@ -62,7 +62,7 @@ UI 仅在该回执仍是当前 epoch 时显示成功或导航。该回执不是�
 
 ```text
 POST /api/auth/device-pair
-{ qr_token, device_name, protocol_version: 1 }
+{ qr_token, device_name, installation_key, protocol_version: 2, previous_device_token? }
 ```
 
 成功响应携带 Desktop 用户、JWT 和设备身份。认证层负责保存连接绑定，
@@ -71,9 +71,35 @@ POST /api/auth/device-pair
 
 账号登录和首次初始化分别使用 `POST /api/auth/device-login` 与
 `POST /api/auth/device-setup`，请求为
-`{ username, password, device_name, protocol_version: 1 }`。
+`{ username, password, device_name, installation_key, protocol_version: 2, previous_device_token? }`。
 两条路径同样只保存独立设备凭据，H5 请求使用 `credentials: 'omit'`，
 不保留浏览器管理会话作为设备撤销后的备用认证。
+
+## 安装身份与授权轮换
+
+连接协议当前为 v2；配对 URL 包装的 `v=1` 仅描述 URL 格式，两者独立。
+旧连接协议缺少安装身份，不能继续注册设备；Mobile 和 Desktop 必须同时更新。
+
+`installation_key` 是按 Desktop 身份隔离的 64 位小写 hex 随机值，不是设备名、
+网络地址、硬件 ID 或登录 token。Native 通过已有 Expo Core 的操作系统 UUID v4
+生成器创建两个 UUID（共 244 bit 随机熵），保存在 Keychain / Keystore；
+H5 使用 `crypto.getRandomValues` 并以 IndexedDB 单 store 作为唯一身份存储，HTTP 局域网页面无需
+`crypto.randomUUID` / `crypto.subtle`。随机源不可用时直接失败，不降级到 `Math.random`。
+
+安装身份独立于当前连接绑定：普通断开、忘记本地连接、凭据过期、重扫和直连/中继
+切换均不会清除；不同 Desktop 各自生成独立值，不共享一个全局追踪身份。
+Native 同一 Desktop 的并发初始化共享一次持久化；H5 在 IndexedDB 的同一
+read/write 事务中读取或首次生成，跨同源标签页也只能产生一个身份，且必须等事务
+complete 后才能注册。IndexedDB 不可用或事务 abort 时直接失败，不回退到其他存储
+或临时身份。保存身份失败时不发送注册请求，
+避免服务端注册成功后丢失身份、下次连接再生成一台设备。
+
+Desktop 使用安装身份识别同一安装，重配保留设备身份并轮换独立凭据；
+旧 token 和已连接的旧 WebSocket 随之失效，同型号不同安装仍显示多台。
+首次升级时，仅当当前绑定与目标 `desktop_id` 相同且保存了设备凭据，才附带
+`previous_device_token`，供 Desktop 验证后认领旧记录；它不替代本次票据或密码授权。
+不同 Desktop 的凭据不得发送到目标地址。旧记录没有安装身份且缺少有效认领证明时，
+无法仅凭相同名称确认是同一手机，不按名称、IP 或时间猜测合并。
 
 ## 扫码与深链接收
 

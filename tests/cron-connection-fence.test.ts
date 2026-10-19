@@ -3,6 +3,7 @@ import { beforeEach, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createConnectionStore } from '@/api/connection-core';
+import { createDeviceIdentityStore } from '@/api/device-identity-core';
 import { connectionNamespace } from '@/api/connection-contract';
 import { createTransportClient, type RequestOptions } from '@/api/transport-client';
 import type { AuthLoginResponse, ConnectionAuthResult, ServerBinding } from '@/api/types';
@@ -12,7 +13,7 @@ const mockModule = (bunTest as unknown as {
   mock: { module(specifier: string, factory: () => unknown): void };
 }).mock.module;
 
-const desktop = { desktop_id: 'a', desktop_name: 'A', protocol_version: 1, min_client_protocol: 1, capabilities: ['agent_session', 'device_pairing'] };
+const desktop = { desktop_id: 'a', desktop_name: 'A', protocol_version: 2, min_client_protocol: 2, capabilities: ['agent_session', 'device_pairing'] };
 const bindingA: ServerBinding = { baseUrl: 'https://desktop-a.test', token: 'fixture-a', user: null, desktop };
 const bindingB: ServerBinding = { ...bindingA, baseUrl: 'https://desktop-b.test', token: 'fixture-b', desktop: { ...desktop, desktop_id: 'b' } };
 let persist: (binding: ServerBinding) => Promise<void> = async () => undefined;
@@ -29,19 +30,24 @@ function storageKey(key: string): string {
   const binding = store.binding();
   return `${key}:${encodeURIComponent(binding ? connectionNamespace(binding) : 'unbound')}`;
 }
-const requests: { url: string; authorization: string | null; key: string | null; method: string }[] = [];
+let identitySequence = 0;
+let persistIdentity = storage.setItem;
+const identities = createDeviceIdentityStore({ get: storage.getItem, set: (key, value) => persistIdentity(key, value) },
+  () => (++identitySequence).toString(16).padStart(64, '0'));
+const requests: { url: string; authorization: string | null; key: string | null; method: string; body: Record<string, unknown> | null }[] = [];
 const attempts: { path: string; expectedEpoch?: number; actualEpoch: number }[] = [];
 const feedback: string[] = [];
 const cacheWrites: unknown[][] = [];
 let fetchResponse: (url: string, options?: RequestInit) => Promise<Response> = async () => Response.json({ success: true, data: {} });
 const client = createTransportClient({ ...store, fetch: (async (url, options) => {
   const headers = new Headers(options?.headers);
-  requests.push({ url: String(url), authorization: headers.get('Authorization'), key: headers.get('Idempotency-Key'), method: options?.method ?? 'GET' });
+  requests.push({ url: String(url), authorization: headers.get('Authorization'), key: headers.get('Idempotency-Key'), method: options?.method ?? 'GET', body: options?.body ? JSON.parse(String(options.body)) as Record<string, unknown> : null });
   return fetchResponse(String(url), options);
 }) as typeof fetch });
 
 mockModule('@react-native-async-storage/async-storage', () => ({ default: storage }));
 mockModule('@/api/connection', () => ({ connectionStore: store, connectionStorageKey: storageKey }));
+mockModule('@/api/device-identity', () => ({ deviceIdentityStore: identities }));
 mockModule('@/api/client', () => ({ rawRequest: client.rawRequest, api: <T>(path: string, opts: RequestOptions = {}) => {
   attempts.push({ path, expectedEpoch: opts.expectedEpoch, actualEpoch: store.epoch() });
   return client.api<T>(path, opts);
@@ -89,6 +95,7 @@ function job(id: string): CronJob {
 }
 beforeEach(async () => {
   persist = async () => undefined;
+  persistIdentity = storage.setItem; identitySequence = 0;
   afterSet = () => undefined;
   data.clear(); requests.length = 0; attempts.length = 0; feedback.length = 0; cacheWrites.length = 0;
   fetchResponse = async () => Response.json({ success: true, data: {} });
@@ -452,4 +459,58 @@ test('a new route waiting for token renewal starts its own refresh when the old 
   } finally {
     nomifunSocket.stop(); globalThis.WebSocket = originalWebSocket;
   }
+});
+
+for (const [name, authenticate] of authFlows) {
+  test(`${name} registers stable installation identity with only a same-Desktop device proof`, async () => {
+    fetchResponse = async url => Response.json(authBody(url));
+    await store.connect({ ...bindingA, device: loginResponse.device });
+    await authenticate(store.epoch());
+    const own = requests.find(request => request.method === 'POST')!;
+    expect(own.body?.protocol_version).toBe(2);
+    expect(own.body?.installation_key).toMatch(/^[0-9a-f]{64}$/);
+    expect(own.body?.previous_device_token).toBe(bindingA.token);
+    expect(own.authorization).toBe(null);
+    requests.length = 0;
+    await store.connect({ ...bindingB, device: loginResponse.device });
+    await authenticate(store.epoch());
+    const foreign = requests.find(request => request.method === 'POST')!;
+    expect(foreign.body?.installation_key).toBe(own.body?.installation_key);
+    expect(foreign.body).not.toHaveProperty('previous_device_token');
+    expect(foreign.authorization).toBe(null);
+  });
+
+  test(`${name} cannot register after installation-key storage fails or its connection intent expires`, async () => {
+    fetchResponse = async url => Response.json(authBody(url));
+    persistIdentity = async () => { throw new Error('Identity write failed'); };
+    expect((await authenticate(store.epoch()).catch(error => error)).message).toBe('Identity write failed');
+    expect(requests.some(request => request.method === 'POST')).toBe(false);
+    let release!: () => void;
+    let started!: () => void;
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    persistIdentity = (key, value) => new Promise<void>(resolve => {
+      release = () => { data.set(key, value); resolve(); }; started();
+    });
+    const operation = authenticate(store.epoch()).catch(error => error);
+    await waiting;
+    await store.connect(bindingB);
+    release();
+    expect((await operation).code).toBe('CONNECTION_CHANGED');
+    expect(requests.some(request => request.method === 'POST')).toBe(false);
+    expect(store.binding()?.token).toBe(bindingB.token);
+  });
+}
+
+test('forgotten bindings and failed credential commits preserve the independently durable installation identity', async () => {
+  fetchResponse = async url => Response.json(authBody(url));
+  persist = async binding => { if (binding.token === 'paired-a') throw new Error('Credential write failed'); };
+  expect((await passwordLogin(bindingA.baseUrl, 'fixture', 'fixture', store.epoch()).catch(error => error)).message).toBe('Credential write failed');
+  const first = requests.find(request => request.method === 'POST')!.body?.installation_key;
+  persist = async () => undefined;
+  await store.disconnect(undefined, store.epoch());
+  await passwordLogin(bindingA.baseUrl, 'fixture', 'fixture', store.epoch());
+  const registrations = requests.filter(request => request.method === 'POST');
+  expect(registrations).toHaveLength(2);
+  expect(registrations[1].body?.installation_key).toBe(first);
+  expect(identitySequence).toBe(1);
 });

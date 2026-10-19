@@ -19,6 +19,7 @@
         "expo-glass-effect": "~57.0.1",
         "expo-image": "~57.0.2",
         "expo-linking": "~57.0.5",
+        "expo-modules-core": "~57.0.10",
         "expo-notifications": "~57.0.9",
         "expo-router": "~57.0.11",
         "expo-secure-store": "~57.0.4",
