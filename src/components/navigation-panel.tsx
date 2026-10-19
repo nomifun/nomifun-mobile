@@ -192,6 +192,7 @@ export function NavigationPanel({
       </View>
       <View style={styles.search}>
         <SearchField
+          containerStyle={styles.searchField}
           placeholder={t('navigation.searchPlaceholder')}
           value={query}
           onFocus={() => setSearching(true)}
@@ -292,6 +293,7 @@ export function NavigationPanel({
             </View>
             {pinned.length ? (
               <ExplorerSection
+                compact
                 title={t('navigation.pinned')}
                 count={pinned.length}
                 expanded={!folded.pinned}
@@ -301,6 +303,7 @@ export function NavigationPanel({
               </ExplorerSection>
             ) : null}
             <ExplorerSection
+              compact
               title={t('navigation.recent')}
               expanded={!folded.recent}
               onToggle={() => toggle('recent')}
@@ -323,6 +326,7 @@ export function NavigationPanel({
             </ExplorerSection>
             {projects.length ? (
               <ExplorerSection
+                compact
                 title={t('navigation.projects')}
                 count={projects.length}
                 expanded={!folded.projects}
@@ -331,6 +335,7 @@ export function NavigationPanel({
                 {projects.map((group) => (
                   <ExplorerSection
                     key={group.key}
+                    compact
                     title={group.displayName}
                     count={group.items.length}
                     icon={folded[group.key] ? 'folder-outline' : 'folder-open-outline'}
@@ -356,6 +361,7 @@ export function NavigationPanel({
               </ExplorerSection>
             ) : null}
             <ExplorerSection
+              compact
               title={t('navigation.tools')}
               expanded={!folded.tools}
               onToggle={() => toggle('tools')}
@@ -510,7 +516,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, minHeight: 0 },
   panel: { flex: 1, minHeight: 0 },
   brand: {
-    minHeight: 56,
+    minHeight: Layout.controlHeight,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
@@ -524,8 +530,9 @@ const styles = StyleSheet.create({
   },
   brandName: { flex: 1, minWidth: 0, fontSize: FontSize.lg, fontWeight: '600' },
   search: { paddingHorizontal: Spacing.md },
-  panelContent: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.md, gap: Spacing.xs },
-  destinations: { marginTop: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1 },
+  searchField: { marginBottom: Spacing.xs },
+  panelContent: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm },
+  destinations: { marginTop: Spacing.xs, paddingBottom: Spacing.xs, borderBottomWidth: 1 },
   navTarget: {
     minHeight: Layout.controlHeight,
     justifyContent: 'center',

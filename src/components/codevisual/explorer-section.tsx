@@ -12,6 +12,7 @@ export function ExplorerSection({
   title,
   count,
   icon,
+  compact = false,
   expanded = true,
   onToggle,
   action,
@@ -20,6 +21,7 @@ export function ExplorerSection({
   title: string;
   count?: number;
   icon?: keyof typeof Ionicons.glyphMap;
+  compact?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
   action?: ReactNode;
@@ -44,7 +46,7 @@ export function ExplorerSection({
     </>
   );
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, compact && styles.compactSection]}>
       <View style={styles.heading}>
         {onToggle ? (
           <Interactive
@@ -66,6 +68,7 @@ export function ExplorerSection({
         <View
           style={[
             styles.branch,
+            compact && styles.compactBranch,
             icon && {
               borderLeftWidth: 1,
               borderLeftColor: colors.borderLight,
@@ -83,6 +86,7 @@ export function ExplorerSection({
 
 const styles = StyleSheet.create({
   section: { marginTop: Spacing.md },
+  compactSection: { marginTop: Spacing.xs },
   heading: { flexDirection: 'row', alignItems: 'center' },
   headingBody: {
     flex: 1,
@@ -96,4 +100,5 @@ const styles = StyleSheet.create({
   title: { flex: 1, minWidth: 0, fontSize: FontSize.xs, fontWeight: '600' },
   count: { fontSize: FontSize.xs, fontVariant: ['tabular-nums'] },
   branch: { gap: Spacing.xs },
+  compactBranch: { gap: 0 },
 });
