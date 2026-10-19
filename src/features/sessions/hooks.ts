@@ -1,30 +1,16 @@
-/**
- * SWR + WebSocket wiring for the session feature.
- *
- * Two hooks:
- * - `useConversationList()` — cursor-paginated list, kept live by
- *   `conversation.listChanged` / `turn.*`, re-snapshotted on `ws.reconnected`,
- *   plus the project sections derived from every loaded page.
- * - `useChatSession(id)` — newest history window + older pages + the live
- *   `message.stream` tail, with optimistic send and stop.
- *
- * The server never replays WS frames, so every reconnect refetches.
- */
+/** Message history and streaming hooks. Session entities and list lifecycle
+ * are owned by SessionDataProvider; chat history remains a separate query. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { connectionStorageKey, connectionStore } from '@/api/connection';
 import useSWR from 'swr';
-import useSWRInfinite from 'swr/infinite';
 
 import { ApiError } from '@/api/types';
 import { useWsTopic } from '@/hooks/use-ws';
 import i18n from '@/i18n';
 
 import {
-  CONVERSATION_PAGE_SIZE,
   cancelTurn,
-  conversationPath,
-  conversationsPath,
   fetchMessages,
   messagesPath,
   newIdempotencyKey,
@@ -36,6 +22,8 @@ import {
   type SendMessageResult,
 } from './api';
 import { cancelObservedTurn } from './turn-cancel';
+import { useSessionData } from './provider';
+import { reconcileRuntimeSnapshot } from './runtime-recovery';
 import { buildMessageContent, parseMessageContent } from './attachments';
 import {
   compareMessages,
@@ -47,7 +35,6 @@ import {
   type ChatMessage,
   type StreamFrame,
 } from './stream';
-import { buildConversationGroups, type ConversationGroup } from './workpath';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -56,13 +43,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function conversationIdOf(data: unknown): string | undefined {
   if (!isRecord(data)) return undefined;
   const id = data.conversation_id;
-  return typeof id === 'string' ? id : undefined;
-}
-
-/** `agentSession.*` events name the session by its canonical id field. */
-function agentSessionIdOf(data: unknown): string | undefined {
-  if (!isRecord(data)) return undefined;
-  const id = data.agent_session_id;
   return typeof id === 'string' ? id : undefined;
 }
 
@@ -100,181 +80,6 @@ function useDebouncedCallback(fn: () => void, delay: number) {
       fnRef.current();
     }, delay);
   }, [delay]);
-}
-
-// ── Session list ───────────────────────────────────────────────────
-
-export interface ConversationListState {
-  items: Conversation[];
-  /**
-   * `items` bucketed by workpath: the default node first, then one section per
-   * project directory. Derived from every page loaded so far, so paging in more
-   * rows grows the existing sections instead of appending a flat tail.
-   */
-  groups: ConversationGroup[];
-  isLoading: boolean;
-  isLoadingMore: boolean;
-  isRefreshing: boolean;
-  hasMore: boolean;
-  error: unknown;
-  /** True while the conversation's runtime is producing a turn. */
-  isGenerating: (conversationId: string) => boolean;
-  loadMore: () => void;
-  refresh: () => Promise<unknown>;
-  retry: () => void;
-}
-
-interface GeneratingOverride {
-  value: boolean;
-  turnId?: string;
-}
-
-export function useConversationList(): ConversationListState {
-  const getKey = (index: number, previous: Paginated<Conversation> | null) => {
-    if (index === 0) return conversationsPath();
-    if (!previous || !previous.has_more) return null;
-    const last = previous.items[previous.items.length - 1];
-    if (!last) return null;
-    return conversationsPath(last.conversation_id);
-  };
-
-  const { data, error, isLoading, isValidating, size, setSize, mutate } = useSWRInfinite<
-    Paginated<Conversation>
-  >(getKey, { revalidateFirstPage: true, parallel: false });
-
-  const [refreshing, setRefreshing] = useState(false);
-  /** turn.started/turn.completed overrides on top of each row's runtime. */
-  const [generating, setGenerating] = useState<
-    Record<string, GeneratingOverride>
-  >({});
-
-  const refetch = useDebouncedCallback(() => {
-    void mutate();
-  }, 250);
-
-  useWsTopic('conversation.listChanged', () => refetch());
-  // An agent/knowledge switch performed on the desktop rewrites the row's
-  // name/model metadata without emitting conversation.listChanged.
-  useWsTopic('agentSession.agentChanged', () => refetch());
-  useWsTopic('ws.reconnected', () => {
-    // A completion frame may have been lost while the socket was down. The
-    // row snapshot is authoritative, so discard local lifecycle overrides
-    // before re-reading it.
-    setGenerating({});
-    refetch();
-  });
-
-  useWsTopic('turn.started', (payload) => {
-    const id = conversationIdOf(payload);
-    if (!id) return;
-    const runtime = isRecord(payload) && isRecord(payload.runtime)
-      ? payload.runtime
-      : undefined;
-    const processing =
-      (typeof runtime?.is_processing === 'boolean'
-        ? runtime.is_processing
-        : undefined) ??
-      (isRecord(payload) && typeof payload.is_processing === 'boolean'
-        ? payload.is_processing
-        : true);
-    const activeTurnId =
-      typeof runtime?.active_turn_id === 'string'
-        ? runtime.active_turn_id
-        : isRecord(payload) && typeof payload.turn_id === 'string'
-          ? payload.turn_id
-          : undefined;
-    const turnId =
-      turnIdOf(payload);
-    if (processing && (!turnId || !activeTurnId || activeTurnId === turnId)) {
-      setGenerating((prev) => ({
-        ...prev,
-        [id]: { value: true, turnId: activeTurnId ?? turnId },
-      }));
-    }
-  });
-
-  useWsTopic('turn.completed', (payload) => {
-    const id = conversationIdOf(payload);
-    if (!id) return;
-    const turnId = turnIdOf(payload);
-    setGenerating((prev) => {
-      const current = prev[id];
-      if (
-        current?.value === true &&
-        current.turnId &&
-        turnId &&
-        current.turnId !== turnId
-      ) {
-        return prev;
-      }
-      return { ...prev, [id]: { value: false, turnId } };
-    });
-    refetch();
-  });
-
-  const items = useMemo(() => {
-    const out: Conversation[] = [];
-    const seen = new Set<string>();
-    for (const page of data ?? []) {
-      for (const row of page?.items ?? []) {
-        if (seen.has(row.conversation_id)) continue;
-        seen.add(row.conversation_id);
-        out.push(row);
-      }
-    }
-    // The server orders by `modified_at` only, so a pinned row sinks as soon as
-    // any other conversation sees activity. Mirror the desktop sidebar: pinned
-    // first (newest pin on top), then last activity.
-    return out.sort(
-      (a, b) =>
-        Number(b.pinned === true) - Number(a.pinned === true) ||
-        (a.pinned === true ? (b.pinned_at ?? 0) - (a.pinned_at ?? 0) : 0) ||
-        b.modified_at - a.modified_at,
-    );
-  }, [data]);
-
-  const lastPage = data && data.length > 0 ? data[data.length - 1] : undefined;
-  const isLoadingMore = size > 0 && !!data && data.length === size && data[size - 1] === undefined;
-
-  // Grouping runs on the whole loaded set (not per page) and inherits the sort
-  // above, so pinned-first / modified_at-desc holds inside every section.
-  const groups = useMemo(() => buildConversationGroups(items), [items]);
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await setSize(1);
-      return await mutate();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [mutate, setSize]);
-
-  const isGenerating = useCallback(
-    (conversationId: string) => {
-      const override = generating[conversationId];
-      if (override !== undefined) return override.value;
-      const row = items.find((item) => item.conversation_id === conversationId);
-      return row?.runtime?.is_processing === true;
-    },
-    [generating, items],
-  );
-
-  return {
-    items,
-    groups,
-    isLoading: isLoading && !data,
-    isLoadingMore: isLoadingMore || (isValidating && !!data && data.length < size),
-    isRefreshing: refreshing,
-    hasMore: lastPage?.has_more === true,
-    error,
-    isGenerating,
-    loadMore: () => {
-      if (lastPage?.has_more && !isLoadingMore) void setSize(size + 1);
-    },
-    refresh,
-    retry: () => void mutate(),
-  };
 }
 
 const COLLAPSED_STORAGE_KEY = 'nomifun:session-list-collapsed-workpaths:v1';
@@ -339,25 +144,7 @@ export function useCollapsedWorkpaths(): CollapsedWorkpaths {
   return { collapsed, toggle };
 }
 
-/** Single conversation row (header title, model chip, runtime state). */
-export function useConversation(conversationId: string | undefined) {
-  const key = conversationId ? conversationPath(conversationId) : null;
-  const swr = useSWR<Conversation>(key);
-  useWsTopic('ws.reconnected', () => {
-    void swr.mutate();
-  });
-  useWsTopic('conversation.listChanged', (payload) => {
-    if (conversationIdOf(payload) === conversationId) void swr.mutate();
-  });
-  // Desktop-side agent/knowledge edits rebind the session; re-project the row.
-  useWsTopic('agentSession.agentChanged', (payload) => {
-    if (agentSessionIdOf(payload) === conversationId) void swr.mutate();
-  });
-  useWsTopic('agentSession.knowledgeChanged', (payload) => {
-    if (agentSessionIdOf(payload) === conversationId) void swr.mutate();
-  });
-  return swr;
-}
+export { useSessionDetail as useConversation } from './provider';
 
 // ── Chat detail ────────────────────────────────────────────────────
 
@@ -402,6 +189,7 @@ export function useChatSession(
   conversation: Conversation | undefined,
   refreshConversation?: () => Promise<Conversation | undefined>,
 ): ChatSessionState {
+  const { epoch, recoveryVersion } = useSessionData();
   const key = conversationId ? messagesPath(conversationId, '') : null;
   const { data, error, isLoading, mutate } = useSWR<Paginated<StoredMessage>>(key);
 
@@ -421,6 +209,12 @@ export function useChatSession(
   const awaitingTurn = useRef(false);
   const pendingAcceptance = useRef<Promise<SendMessageResult> | null>(null);
   const runtimeGeneration = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; runtimeGeneration.current += 1; };
+  }, []);
 
   // Switching conversations resets every per-chat projection.
   useEffect(() => {
@@ -493,43 +287,25 @@ export function useChatSession(
   }, [mutate]);
 
   const reconcileSoon = useDebouncedCallback(() => {
-    void reconcile();
+    void reconcile().catch(() => undefined); // SWR retains the read error for retry.
   }, 400);
   const reconcileRuntime = useCallback(async () => {
     if (!refreshConversation) return;
-    const generation = runtimeGeneration.current;
-    let fresh: Conversation | undefined;
-    try {
-      fresh = await refreshConversation();
-    } catch {
-      return;
-    }
-    if (generation !== runtimeGeneration.current) return;
-    if (!fresh?.runtime) return;
-
-    const runtime = fresh.runtime;
-    awaitingTurn.current = false;
-    if (runtime?.is_processing === true) {
-      const runtimeTurnId = runtime.active_turn_id?.trim() || undefined;
-      if (runtimeTurnId && completedTurnIds.current.has(runtimeTurnId)) {
-        activeTurnId.current = null;
-        sawCompletion.current = true;
-        setStreaming(false);
-        setRuntimeCanSend(true);
-        return;
-      }
-      activeTurnId.current = runtimeTurnId ?? null;
-      sawCompletion.current = false;
-      setStreaming(true);
-      setRuntimeCanSend(runtime.can_send_message ?? false);
-      return;
-    }
-
-    activeTurnId.current = null;
-    sawCompletion.current = true;
-    setStreaming(false);
-    setRuntimeCanSend(runtime?.can_send_message ?? true);
-  }, [refreshConversation]);
+    await reconcileRuntimeSnapshot({
+      read: refreshConversation,
+      acceptance: pendingAcceptance.current,
+      generation: () => runtimeGeneration.current,
+      isCurrent: () => mounted.current && connectionStore.epoch() === epoch,
+      completedTurnIds: completedTurnIds.current,
+      apply: runtime => {
+        awaitingTurn.current = false;
+        activeTurnId.current = runtime.activeTurnId;
+        sawCompletion.current = runtime.sawCompletion;
+        setStreaming(runtime.streaming);
+        setRuntimeCanSend(runtime.canSend);
+      },
+    });
+  }, [refreshConversation, epoch]);
   const reconcileRuntimeSoon = useDebouncedCallback(() => {
     void reconcileRuntime();
   }, 400);
@@ -603,21 +379,21 @@ export function useChatSession(
         ? payload.is_processing
         : true);
     const nextTurnId = runtimeTurnId ?? turnId;
-    if (
-      !processing ||
-      (turnId && runtimeTurnId && turnId !== runtimeTurnId) ||
-      (activeTurnId.current &&
+    if (!processing || (turnId && runtimeTurnId && turnId !== runtimeTurnId)) return;
+    // Even when an earlier delivery gap left another active ID locally, this
+    // exact start fences every older HTTP snapshot. The fresh entity read can
+    // reconcile which turn currently owns the runtime.
+    runtimeGeneration.current += 1;
+    if (activeTurnId.current &&
         nextTurnId &&
         activeTurnId.current !== nextTurnId &&
-        !sawCompletion.current)
-    ) {
+        !sawCompletion.current) {
       return;
     }
     if (nextTurnId) {
       activeTurnId.current = nextTurnId;
       completedTurnIds.current.delete(nextTurnId);
     }
-    runtimeGeneration.current += 1;
     awaitingTurn.current = false;
     sawCompletion.current = false;
     setStreaming(true);
@@ -669,6 +445,7 @@ export function useChatSession(
   // `turn.completed` on cancel close it out.
   useWsTopic('turn.paused', (payload) => {
     if (!conversationId || conversationIdOf(payload) !== conversationId) return;
+    runtimeGeneration.current += 1;
     const runtime = isRecord(payload) && isRecord(payload.runtime) ? payload.runtime : undefined;
     awaitingTurn.current = false;
     setStreaming(true);
@@ -682,22 +459,23 @@ export function useChatSession(
     reconcileSoon();
   });
 
-  // No server-side replay: re-snapshot history and drop every optimistic
-  // projection, including the composer lock (a missed turn.completed must not
-  // strand the input in a disabled state).
-  useWsTopic('ws.reconnected', () => {
+  const runtimeRefreshRef = useRef(reconcileRuntime);
+  runtimeRefreshRef.current = reconcileRuntime;
+  const historyRefreshRef = useRef(mutate);
+  historyRefreshRef.current = mutate;
+  const recoveredVersion = useRef(recoveryVersion);
+  // The provider owns every delivery-gap signal, including short native
+  // suspensions whose socket still reports OPEN. Keep the current turn lock
+  // until a fresh snapshot proves its state; newer lifecycle frames fence it.
+  useEffect(() => {
+    if (recoveredVersion.current === recoveryVersion) return;
+    recoveredVersion.current = recoveryVersion;
     if (!conversationId) return;
     setLive([]);
-    setStreaming(false);
-    setRuntimeCanSend(false);
-    sawCompletion.current = true;
-    activeTurnId.current = null;
-    completedTurnIds.current.clear();
-    awaitingTurn.current = false;
     runtimeGeneration.current += 1;
-    reconcileRuntimeSoon();
-    void mutate();
-  });
+    void runtimeRefreshRef.current();
+    void historyRefreshRef.current().catch(() => undefined);
+  }, [conversationId, recoveryVersion]);
 
   const history = useMemo(() => {
     const rows = [...older.rows, ...(data?.items ?? [])];
@@ -813,7 +591,7 @@ export function useChatSession(
           awaitingTurn.current = false;
           sawCompletion.current = true;
           activeTurnId.current = null;
-          void reconcile();
+          void reconcile().catch(() => undefined);
           if (result.result_ok === false) {
             completedReceipt = true;
             throw new ApiError(
@@ -897,12 +675,10 @@ export function useChatSession(
     streaming,
     canSend: runtimeCanSend ?? conversation?.runtime?.can_send_message ?? true,
     refresh,
-    retry: () => void mutate(),
+    retry: () => { void mutate().catch(() => undefined); },
     loadOlder,
     send,
     retryLast,
     stop,
   };
 }
-
-export { CONVERSATION_PAGE_SIZE };

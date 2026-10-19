@@ -1,7 +1,7 @@
 /**
  * Chat transcript model + the `message.stream` delta reducer.
  *
- * Mirrors the desktop merge semantics (docs/research/feature-sessions.md §4):
+ * Projects the current message.stream wire contract (docs/research/ws-protocol.md):
  * identity is `msg_id` + render type, text appends unless `replace`, thinking
  * back-patches on `status: 'done'`, tool frames merge by `call_id` with error
  * as an absorbing state. Everything the mobile client cannot render is

@@ -5,9 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { NavigationPanel } from '@/components/navigation-panel';
 import { NavigationDrawer } from '@/components/navigation-drawer';
 import { Layout } from '@/constants/theme';
-import { createConversation } from '@/features/sessions/api';
-import { useConversationList } from '@/features/sessions/hooks';
-import { SessionListContext } from '@/features/sessions/list-context';
+import { useSessionList } from '@/features/sessions/list-context';
+import { isStaleSessionError, sessionErrorText } from '@/features/sessions/errors';
 import { AppNavigationContext } from '@/hooks/use-app-navigation';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -19,10 +18,10 @@ export function AppNavigation({ children }: PropsWithChildren) {
   const { t: tc } = useTranslation('common');
   const permanent = width >= Layout.sidebarBreakpoint;
   const [opened, setOpened] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const creatingRef = useRef(false);
-  const list = useConversationList();
+  const list = useSessionList();
+  const creating = list.creating;
   const close = useCallback(() => {
     if (!creatingRef.current) setOpened(false);
   }, []);
@@ -34,20 +33,19 @@ export function AppNavigation({ children }: PropsWithChildren) {
   const create = useCallback(async () => {
     if (creatingRef.current) return;
     creatingRef.current = true;
-    setCreating(true);
     setError('');
     try {
-      const created = await createConversation(t('create.defaultName'));
-      list.retry();
+      const created = await list.create(t('create.defaultName'));
+      if (!list.isCurrent() || created.epoch !== list.epoch) return;
       if (created?.conversation_id) {
         setOpened(false);
         router.push(`/session/${created.conversation_id}`);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : tc('feedback.requestFailed'));
+      if (!list.isCurrent() || isStaleSessionError(cause)) return;
+      setError(sessionErrorText(cause, tc('feedback.requestFailed')));
     } finally {
       creatingRef.current = false;
-      setCreating(false);
     }
   }, [list, t, tc]);
   const navigationState = useMemo(() => ({ permanent, open: () => setOpened(true) }), [permanent]);
@@ -66,7 +64,6 @@ export function AppNavigation({ children }: PropsWithChildren) {
   );
   return (
     <AppNavigationContext.Provider value={navigationState}>
-      <SessionListContext.Provider value={list}>
         <View style={[styles.shell, { backgroundColor: colors.background }]}>
           {permanent ? (
             <View style={[styles.sidebar, { borderRightColor: colors.borderLight }]}>{panel}</View>
@@ -78,7 +75,6 @@ export function AppNavigation({ children }: PropsWithChildren) {
             {panel}
           </NavigationDrawer>
         ) : null}
-      </SessionListContext.Provider>
     </AppNavigationContext.Provider>
   );
 }

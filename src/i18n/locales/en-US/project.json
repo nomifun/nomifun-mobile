@@ -6,7 +6,7 @@
     "pick": "Choose a directory",
     "change": "Change directory",
     "unselectedTitle": "No directory chosen yet",
-    "unselectedHint": "Pick a directory on the desktop machine; you can change it later.",
+    "unselectedHint": "Choose a directory on the Desktop machine. This conversation keeps that workspace after creation.",
     "nameLabel": "Session name",
     "namePlaceholder": "Defaults to the folder name",
     "nameHint": "Leave empty to use the folder name.",
@@ -36,14 +36,7 @@
     "copy": "Copy path",
     "projectHint": "The agent works out of this directory and can read and write files in it.",
     "temporaryHint": "This is a temporary directory the desktop allocated automatically and manages itself. Temporary sessions cannot be rebound to a project directory — create a new project session if you need a fixed one.",
-    "change": "Change working directory",
-    "browse": "Browse project files",
-    "changeTitle": "Change working directory?",
-    "changeBody": "New directory: {{path}}\n\nChanging it restarts this conversation's agent; it takes effect on the next message.",
-    "changeRisky": "Careful: this is a system directory or one that may hold credentials.",
-    "changeConfirm": "Change",
-    "changed": "Working directory changed; effective on the next message",
-    "changeFailed": "Could not change: {{message}}"
+    "browse": "Browse project files"
   },
   "files": {
     "title": "Project files",

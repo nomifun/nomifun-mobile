@@ -9,8 +9,7 @@
  * `cron.job-executed`, so by the time an `executed` event arrives the cached
  * job already carries the new `last_status` / `next_run_at_ms`.
  */
-import { useCallback, useEffect, useMemo } from 'react';
-import { AppState } from 'react-native';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR, { useSWRConfig } from 'swr';
 
@@ -83,16 +82,6 @@ function sortJobs(jobs: CronJob[]): CronJob[] {
   });
 }
 
-/** Refetch whenever the app comes back to the foreground (guaranteed WS gap). */
-function useForegroundRefresh(refresh: () => void) {
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
-    });
-    return () => sub.remove();
-  }, [refresh]);
-}
-
 export interface CronJobsResult {
   jobs: CronJob[];
   total: number;
@@ -135,7 +124,6 @@ export function useCronJobs(): CronJobsResult {
   // safety net for a dropped update.
   useWsTopic(CRON_TOPICS.executed, refresh);
   useWsTopic(CRON_TOPICS.reconnected, refresh);
-  useForegroundRefresh(refresh);
 
   const jobs = useMemo(() => sortJobs(data ?? []), [data]);
 
@@ -173,7 +161,6 @@ export function useCronJob(id: string | undefined, onRemoved?: () => void): Cron
     if (jobIdOf(payload) === id) onRemoved?.();
   });
   useWsTopic(CRON_TOPICS.reconnected, refresh);
-  useForegroundRefresh(refresh);
 
   return {
     job: data,

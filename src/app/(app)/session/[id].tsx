@@ -13,8 +13,8 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { AppMenuButton } from '@/components/app-menu-button';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '@/api/types';
-import { Button, EmptyState, ErrorState, Loading, Screen, toast } from '@/components/ui';
+import { sessionErrorText } from '@/features/sessions/errors';
+import { Button, EmptyState, ErrorState, Loading, Notice, Screen, toast } from '@/components/ui';
 import { FontSize, Layout, Spacing } from '@/constants/theme';
 import { WorkspacePanel } from '@/features/projects/components/workspace-panel';
 import { useAttachments } from '@/features/sessions/attachments';
@@ -35,9 +35,7 @@ type Row = TranscriptItem & {
 };
 
 function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return fallback;
+  return sessionErrorText(error, fallback);
 }
 
 function buildRows(messages: ChatMessage[], showTools: boolean): Row[] {
@@ -176,7 +174,7 @@ export default function SessionDetailScreen() {
   const composer = (
     <Composer
       streaming={chat.streaming}
-      canSend={chat.canSend}
+      canSend={chat.canSend && !!conversation.data && !conversation.error}
       disabledHint={t('detail.cannotSend')}
       attachments={attachments}
       conversation={conversation.data}
@@ -186,7 +184,20 @@ export default function SessionDetailScreen() {
     />
   );
 
-  if (chat.isLoading) {
+  if (conversation.error && !conversation.data) {
+    return (
+      <Screen scroll={false}>
+        {header}
+        <ErrorState
+          message={sessionErrorText(conversation.error, t('detail.sessionLoadFailed'))}
+          onRetry={() => void conversation.mutate()}
+          retryLabel={tc('actions.retry')}
+        />
+      </Screen>
+    );
+  }
+
+  if (conversation.isLoading || chat.isLoading) {
     return (
       <Screen scroll={false}>
         {header}
@@ -195,6 +206,13 @@ export default function SessionDetailScreen() {
       </Screen>
     );
   }
+
+  const metadataNotice = conversation.error ? (
+    <View style={styles.metadataNotice}>
+      <Notice tone="danger">{sessionErrorText(conversation.error, t('detail.sessionLoadFailed'))}</Notice>
+      <Button variant="ghost" onPress={() => void conversation.mutate()}>{tc('actions.retry')}</Button>
+    </View>
+  ) : null;
 
   if (chat.error && chat.messages.length === 0) {
     return (
@@ -216,6 +234,7 @@ export default function SessionDetailScreen() {
       <Screen scroll={false} keyboardAvoiding footer={composer}>
         {header}
         {workspaceBar}
+        {metadataNotice}
         <EmptyState
           icon="chatbubble-ellipses-outline"
           title={t('detail.emptyTitle')}
@@ -229,6 +248,7 @@ export default function SessionDetailScreen() {
     <Screen scroll={false} keyboardAvoiding footer={composer}>
       {header}
       {workspaceBar}
+      {metadataNotice}
       <FlatList
         ref={listRef}
         data={data}
@@ -276,6 +296,7 @@ export default function SessionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  metadataNotice: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
   content: { padding: Spacing.lg, paddingBottom: Spacing.md },
   stamp: {
     fontSize: FontSize.xs,

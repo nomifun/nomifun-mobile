@@ -82,7 +82,15 @@ export default function RootLayout() {
             fetcher: apiFetcher,
             revalidateOnFocus: true,
             shouldRetryOnError: false,
-            errorRetryCount: 2,
+            ...(Platform.OS === 'web' ? {} : {
+              isVisible: () => AppState.currentState === 'active',
+              initFocus: (callback: () => void) => {
+                const subscription = AppState.addEventListener('change', state => {
+                  if (state === 'active') callback();
+                });
+                return () => subscription.remove();
+              },
+            }),
           }}
         >
           <ConnectionCacheBridge />

@@ -163,7 +163,6 @@ Playwright 不是仓库依赖，按需安装或用 `NOMI_E2E_PLAYWRIGHT` 指向�
 - [Desktop 连接与设备指南](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.zh.md)
 - [WebSocket 协议研究](docs/research/ws-protocol.md)
 - [文件浏览 API](docs/research/fs-browse-api.md)
-- [工作区运行时](docs/research/workspace-runtime.md)
 - [测试指南](docs/TESTING.md)
 
 ## ⚖️ License

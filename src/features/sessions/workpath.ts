@@ -4,7 +4,7 @@
  * `workpathTree.ts`), so the phone shelves a conversation under exactly the
  * same project node the desktop does.
  *
- * Protocol facts (docs/research/project-sessions.md §1/§4, workspace-runtime.md §2):
+ * Presentation contract: docs/PROJECT-SESSIONS-CONTRACT.md.
  * - There is no project table, no `project_id`. A "project session" is nothing
  *   but a non-empty `extra.workspace` pointing at a directory on the host.
  * - The server strips `custom_workspace` on create, so the desktop derives it
@@ -158,15 +158,14 @@ export interface ConversationGroup {
   /** Basename, disambiguated against the other groups; `''` for the default. */
   displayName: string;
   isDefault: boolean;
-  /** Members in the caller's order (pinned first, then `modified_at` desc). */
+  /** Members in the caller's display order; never used to derive page cursors. */
   items: Conversation[];
   /** `max(modified_at)` over the members — the desktop node `activityAt`. */
   activityAt: number;
 }
 
 /**
- * Group an already-sorted conversation list (pinned first, then `modified_at`
- * desc — see `useConversationList`) into sections. Member order is preserved,
+ * Group the loaded display window into sections. Member order is preserved,
  * so the in-group ordering is inherited rather than recomputed.
  *
  * Section order mirrors the desktop (`workpathTree.ts:124-133`) minus the

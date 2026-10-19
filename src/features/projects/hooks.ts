@@ -11,10 +11,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { mutateConnectionCache as globalMutate } from '@/api/connection-cache';
 
-import type { Conversation, Paginated } from '@/features/sessions/api';
-import { conversationsPath } from '@/features/sessions/api';
+import { useSessionList } from '@/features/sessions/list-context';
 
 import {
   type FileMetadata,
@@ -45,18 +43,6 @@ import {
   truncatePreview,
 } from './preview';
 import { type DirectoryShortcut, RECENT_PROJECT_LIMIT, recentProjectShortcuts } from './recent';
-
-/**
- * Drop every cached conversation-list page after a create/rebind so the session
- * list regroups. The list is `useSWRInfinite`, whose internal keys wrap the
- * request path, hence the substring match instead of a prefix one.
- *
- * `conversation.listChanged` normally covers this over WebSocket; this is the
- * belt for the case where the socket is reconnecting.
- */
-export function invalidateConversationLists(): void {
-  void globalMutate((key) => typeof key === 'string' && key.includes('/api/agent-sessions?'));
-}
 
 type Listing =
   | { kind: 'ok'; entries: WorkspaceEntry[] }
@@ -159,29 +145,14 @@ export function useWorkspaceBrowser(conversationId: string | undefined): Workspa
 
 // ── Recent project directories ─────────────────────────────────────
 
-/**
- * The last few project directories, for the picker's start screen.
- *
- * Reads page one of `GET /api/agent-sessions` (25 rows) and derives the list —
- * see `./recent`. No local storage: the desktop is the single source of truth,
- * so the list is identical on every device and self-heals when a project
- * session is deleted. `enabled: false` (a closed picker) fetches nothing.
- */
+/** Project shortcuts derive from the same connection-scoped session catalog. */
 export function useRecentProjectDirectories(
   label: (name: string) => string,
   enabled = true,
   limit = RECENT_PROJECT_LIMIT,
 ): DirectoryShortcut[] {
-  const { data } = useSWR<Paginated<Conversation>>(enabled ? conversationsPath() : null, {
-    revalidateOnFocus: false,
-    // Purely decorative: a failure means no shortcuts, never an error state.
-    shouldRetryOnError: false,
-  });
-  // Not memoized on purpose: `label` is an inline arrow, so any dependency list
-  // would either be wrong (stale labels) or useless (new identity every
-  // render). Deriving five shortcuts from ≤25 rows is cheaper than the ceremony,
-  // and with the picker closed there is no data to walk at all.
-  return recentProjectShortcuts(data?.items ?? [], label, limit);
+  const list = useSessionList();
+  return enabled ? recentProjectShortcuts(list.items, label, limit) : [];
 }
 
 // ── File preview ───────────────────────────────────────────────────

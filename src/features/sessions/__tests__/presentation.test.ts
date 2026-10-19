@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Conversation } from '../api';
-import { filterConversations } from '../presentation';
+import { filterConversations, orderConversationWindow } from '../presentation';
+import { createSessionCatalog } from '../catalog';
 
 const session = (id: string, patch: Partial<Conversation> = {}): Conversation => ({
   conversation_id: id,
@@ -19,6 +20,21 @@ const items = [
 ];
 
 describe('conversation inbox scope', () => {
+  test('display pinning does not change the server cursor used for the next page', async () => {
+    const requests: Array<string | undefined> = [];
+    const source = [session('new', { modified_at: 5 }), session('old-pin', { pinned: true })];
+    const catalog = createSessionCatalog({ epoch: 1, fetchPage: async ({ cursor }) => {
+      requests.push(cursor);
+      return cursor ? { items: [session('older')], total: 3, has_more: false }
+        : { items: source, total: 3, has_more: true };
+    } });
+    await catalog.refresh();
+    expect(orderConversationWindow(catalog.getSnapshot().items).map(item => item.conversation_id)).toEqual(['old-pin', 'new']);
+    await catalog.loadMore();
+    expect(requests).toEqual([undefined, 'old-pin']);
+    expect(source[0]?.conversation_id).toBe('new');
+    catalog.dispose();
+  });
   test('all retains source order and items', () =>
     expect(filterConversations(items, '', 'all')).toEqual(items));
   test('pinned uses the server flag', () =>

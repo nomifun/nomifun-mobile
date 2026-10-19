@@ -5,23 +5,10 @@
  */
 import { useCallback, useMemo } from 'react';
 
-import { api } from '@/api/client';
 import { useProviders, useTaskModels } from '@/features/models/hooks';
 
-import { agentSessionPath, type Conversation } from './api';
+import type { Conversation } from './api';
 import { buildModelGroups, currentModelRef } from './model-switch';
-
-export function patchConversationModel(
-  conversationId: string,
-  option: { providerId: string; model: string },
-): Promise<unknown> {
-  return api<unknown>(`${agentSessionPath(conversationId)}/model`, {
-    method: 'PUT',
-    // The body IS the `AgentChatModelSelectionDto` — `{provider_id, model}`
-    // unwrapped, `deny_unknown_fields`.
-    body: { provider_id: option.providerId, model: option.model },
-  });
-}
 
 /** Grouped chat-capable models + the current binding, ready for the picker. */
 export function useModelOptions(conversation: Conversation | undefined, enabled: boolean) {

@@ -274,6 +274,9 @@ class NomifunSocket {
       this.connectStartedAt = 0;
       this.lastActivity = Date.now();
       this.setStatus('open');
+      // The first HTTP snapshot can predate the subscription. Every successful
+      // connection, including the first one, needs an authoritative resnapshot.
+      this.dispatch('ws.ready', undefined);
       // Do not reset backoff here: a server can complete the handshake and
       // immediately reject an expired token. The first inbound frame proves
       // that the connection is genuinely alive.

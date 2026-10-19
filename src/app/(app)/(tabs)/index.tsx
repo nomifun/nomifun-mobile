@@ -3,7 +3,6 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '@/api/types';
 import {
   Button,
   EmptyState,
@@ -19,12 +18,8 @@ import {
 } from '@/components/ui';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
-import {
-  createConversation,
-  deleteConversation,
-  patchConversation,
-  type Conversation,
-} from '@/features/sessions/api';
+import type { Conversation } from '@/features/sessions/api';
+import { isStaleSessionError, sessionErrorText } from '@/features/sessions/errors';
 import { ExplorerSection } from '@/components/codevisual/explorer-section';
 import { SessionActions } from '@/features/sessions/components/session-actions';
 import { SessionRow } from '@/features/sessions/components/session-row';
@@ -34,12 +29,6 @@ import { filterConversations, type SessionScope } from '@/features/sessions/pres
 import { buildConversationGroups, type ConversationGroup } from '@/features/sessions/workpath';
 import { useTheme } from '@/hooks/use-theme';
 import { useWsStatus } from '@/hooks/use-ws';
-
-function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
 
 /**
  * One flat FlatList over section headers + rows. A flattened list (rather than
@@ -58,26 +47,24 @@ export default function SessionListScreen() {
   const wsStatus = useWsStatus();
   const { collapsed, toggle } = useCollapsedWorkpaths();
 
-  const [creating, setCreating] = useState(false);
+  const creating = list.creating;
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<SessionScope>('all');
   const [target, setTarget] = useState<Conversation | null>(null);
 
   const create = useCallback(async () => {
     if (creating) return;
-    setCreating(true);
     try {
-      const created = await createConversation(t('create.defaultName'));
-      list.retry();
+      const created = await list.create(t('create.defaultName'));
+      if (!list.isCurrent() || created.epoch !== list.epoch) return;
       if (created?.conversation_id) router.push(`/session/${created.conversation_id}`);
     } catch (error) {
+      if (!list.isCurrent() || isStaleSessionError(error)) return;
       toast.error(
         t('list.createFailed', {
-          message: errorText(error, tc('feedback.requestFailed')),
+          message: sessionErrorText(error, tc('feedback.requestFailed')),
         }),
       );
-    } finally {
-      setCreating(false);
     }
   }, [creating, list, t, tc]);
 
@@ -117,12 +104,13 @@ export default function SessionListScreen() {
     async (action: () => Promise<unknown>, successText: string) => {
       try {
         await action();
+        if (!list.isCurrent()) return;
         toast.success(successText);
-        list.retry();
       } catch (error) {
+        if (!list.isCurrent() || isStaleSessionError(error)) return;
         toast.error(
           t('actions.failed', {
-            message: errorText(error, tc('feedback.requestFailed')),
+            message: sessionErrorText(error, tc('feedback.requestFailed')),
           }),
         );
         throw error;
@@ -154,7 +142,7 @@ export default function SessionListScreen() {
         <Text style={[styles.footer, { color: colors.textTertiary }]}>{t('list.loadingMore')}</Text>
       );
     }
-    if (!list.hasMore && list.items.length > 6) {
+    if (!list.hasMore && !list.isRefreshing && !list.error && list.items.length > 6) {
       return (
         <Text style={[styles.footer, { color: colors.textTertiary }]}>{t('list.noMore')}</Text>
       );
@@ -176,7 +164,7 @@ export default function SessionListScreen() {
       <Screen scroll={false}>
         <View style={styles.loadingHeading}>{heading}</View>
         <ErrorState
-          message={errorText(list.error, t('list.loadFailed'))}
+          message={sessionErrorText(list.error, t('list.loadFailed'))}
           onRetry={list.retry}
           retryLabel={tc('actions.retry')}
         />
@@ -221,6 +209,12 @@ export default function SessionListScreen() {
           <Notice tone="warning" icon="cloud-offline-outline">
             {t('list.wsOffline')}
           </Notice>
+        </View>
+      ) : null}
+      {list.error && list.items.length > 0 ? (
+        <View style={styles.wsBanner}>
+          <Notice tone="danger">{sessionErrorText(list.error, t('list.loadFailed'))}</Notice>
+          <Button variant="ghost" onPress={list.retry}>{tc('actions.retry')}</Button>
         </View>
       ) : null}
       <FlatList
@@ -269,8 +263,9 @@ export default function SessionListScreen() {
           query.trim() || scope !== 'all' ? (
             <EmptyState
               icon="search-outline"
-              title={t('list.noMatches')}
+              title={list.hasMore ? t('list.noLoadedMatches') : t('list.noMatches')}
               action={
+                <View style={styles.emptyActions}>
                 <Button
                   variant="secondary"
                   onPress={() => {
@@ -280,6 +275,12 @@ export default function SessionListScreen() {
                 >
                   {t('list.clearFilters')}
                 </Button>
+                {list.hasMore ? (
+                  <Button variant="secondary" loading={list.isLoadingMore} onPress={() => void list.loadMore()}>
+                    {tc('navigation.loadMore')}
+                  </Button>
+                ) : null}
+                </View>
               }
             />
           ) : (
@@ -312,20 +313,20 @@ export default function SessionListScreen() {
         onRename={async (name) => {
           const id = target?.conversation_id;
           if (!id) return;
-          await runAction(() => patchConversation(id, { name }), t('actions.renamed'));
+          await runAction(() => list.patch(id, { name }), t('actions.renamed'));
         }}
         onTogglePin={async (pinned) => {
           const id = target?.conversation_id;
           if (!id) return;
           await runAction(
-            () => patchConversation(id, { pinned }),
+            () => list.patch(id, { pinned }),
             pinned ? t('actions.pinned') : t('actions.unpinned'),
           );
         }}
         onDelete={async () => {
           const id = target?.conversation_id;
           if (!id) return;
-          await runAction(() => deleteConversation(id), tc('feedback.deleted'));
+          await runAction(() => list.remove(id), tc('feedback.deleted'));
         }}
       />
     </Screen>

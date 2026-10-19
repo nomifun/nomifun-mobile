@@ -26,7 +26,7 @@ export interface TransportDependencies {
 
 /** Shared real HTTP transport, also executable without React Native in stack acceptance. */
 export function createTransportClient(deps: TransportDependencies) {
-  async function rawRequest<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
+  async function request<T>(path: string, opts: RequestOptions): Promise<{ data: T; status: number }> {
     const binding = deps.binding();
     const epoch = deps.epoch();
     if (opts.expectedEpoch !== undefined && opts.expectedEpoch !== epoch) throw new StaleConnectionError();
@@ -57,7 +57,8 @@ export function createTransportClient(deps: TransportDependencies) {
       const text = await res.text();
       assertCurrent();
       let json: unknown = null;
-      try { json = text ? JSON.parse(text) : null; } catch { /* The status still explains invalid proxy responses. */ }
+      let invalidJson = false;
+      try { json = text ? JSON.parse(text) : null; } catch { invalidJson = true; }
       const body = (json ?? {}) as { code?: string; error?: string; message?: string };
       const message = body.error ?? body.message ?? `HTTP ${res.status}`;
       const rejectedCredential = Boolean(token) &&
@@ -66,18 +67,28 @@ export function createTransportClient(deps: TransportDependencies) {
            !/csrf/i.test(message) && /invalid or expired token|authentication required|user not found/i.test(message)))));
       if (rejectedCredential && token) { deps.markAuthExpired(token, epoch); throw new AuthExpiredError(message); }
       if (!res.ok) throw new ApiError(message, res.status, body.code);
-      return json as T;
+      if (invalidJson || (!text && res.status !== 204)) {
+        throw new ApiError('The Desktop returned an invalid JSON response', res.status, 'INVALID_API_RESPONSE');
+      }
+      return { data: json as T, status: res.status };
     } finally {
       clearTimeout(timeout); opts.signal?.removeEventListener('abort', abort);
     }
   }
+  async function rawRequest<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
+    return (await request<T>(path, opts)).data;
+  }
   async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-    const envelope = await rawRequest<ApiEnvelope<T> & { error?: string; code?: string }>(path, opts);
-    if (envelope && typeof envelope === 'object' && 'success' in envelope) {
-      if (!envelope.success) throw new ApiError(envelope.message ?? envelope.error ?? 'Request failed', 200, envelope.code);
-      return envelope.data as T;
+    const response = await request<ApiEnvelope<T> & { error?: string; code?: string }>(path, opts);
+    if (response.status === 204) return undefined as T;
+    const envelope = response.data;
+    if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) || typeof envelope.success !== 'boolean') {
+      throw new ApiError('The Desktop returned an invalid API envelope', 200, 'INVALID_API_RESPONSE');
     }
-    return envelope as unknown as T;
+    if (!envelope.success) throw new ApiError(envelope.message ?? envelope.error ?? 'Request failed', 200, envelope.code);
+    // Empty mutation receipts are legitimate. Data-bearing features validate
+    // their DTO before publishing it; missing list data is never an empty list.
+    return envelope.data as T;
   }
   return { rawRequest, api };
 }

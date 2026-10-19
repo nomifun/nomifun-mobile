@@ -16,7 +16,8 @@
     "waiting": "待确认",
     "untitled": "未命名会话",
     "createFailed": "新建会话失败：{{message}}",
-    "wsOffline": "实时连接已断开，正在重连…"
+    "wsOffline": "实时连接已断开，正在重连…",
+    "noLoadedMatches": "已加载的会话中没有匹配项"
   },
   "create": {
     "action": "新建会话",
@@ -52,7 +53,8 @@
     "typing": "正在生成回复…",
     "stopped": "已停止生成",
     "cannotSend": "智能体正忙，请稍候再发送",
-    "desktopOnlyHint": "工作区、终端与审批等能力请在桌面端操作。"
+    "desktopOnlyHint": "工作区、终端与审批等能力请在桌面端操作。",
+    "sessionLoadFailed": "会话信息加载失败"
   },
   "message": {
     "thinking": "思考中…",
@@ -148,5 +150,10 @@
     "loadFailed": "读取模型列表失败",
     "emptyTitle": "没有可用的对话模型",
     "emptyHint": "请先在「工具与服务 → 模型管理」里添加供应商，或在桌面端配置。"
+  },
+  "errors": {
+    "protocol": "桌面端返回的会话数据格式不兼容，请核对手机和桌面版本后重试。",
+    "creating": "正在创建会话，请稍候。",
+    "pendingCreation": "有多次创建结果尚未确认，请先重试未完成的创建。"
   }
 }

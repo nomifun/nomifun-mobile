@@ -5,6 +5,7 @@ import { FontSize, FontWeight } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AppNavigation } from '@/components/app-navigation';
 import { AppMenuButton } from '@/components/app-menu-button';
+import { SessionDataProvider } from '@/features/sessions/provider';
 
 /** Layout for every authenticated screen; feature detail routes live here. */
 export default function AppLayout() {
@@ -12,6 +13,7 @@ export default function AppLayout() {
   const { t } = useTranslation('common');
 
   return (
+    <SessionDataProvider>
     <AppNavigation>
       <Stack
         screenOptions={{
@@ -30,5 +32,6 @@ export default function AppLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
     </AppNavigation>
+    </SessionDataProvider>
   );
 }

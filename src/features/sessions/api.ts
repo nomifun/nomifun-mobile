@@ -12,17 +12,11 @@
  *   dropped by JSON.stringify).
  */
 import { api } from '@/api/client';
-import { listProviders } from '@/features/models/api';
-import {
-  firstUsableModel,
-  isUsableModelRef,
-} from '@/features/models/selectors';
-import type { ModelRef } from '@/features/models/types';
-import i18n from '@/i18n';
-import {
-  resolveRequiredResourceSelections,
-  type AgentResourceSelection,
-} from './resource-selections';
+import { connectionStore } from '@/api/connection';
+import type { RequestOptions } from '@/api/transport-client';
+import { createConversationCommand } from './commands';
+import { conversationListResponse, conversationResponse } from './wire';
+export type { CreateConversationOptions, CreatedConversation } from './commands';
 
 // ── Session row (ConversationResponse projection) ────────────────
 
@@ -39,8 +33,8 @@ export interface ConversationRuntime {
   has_runtime?: boolean;
   runtime_status?: string;
   is_processing?: boolean;
-  active_turn_id?: string;
-  processing_started_at?: number;
+  active_turn_id?: string | null;
+  processing_started_at?: number | null;
 }
 
 export interface ConversationExtra {
@@ -231,7 +225,7 @@ export function agentSessionPath(conversationId: string): string {
   return `${AGENT_SESSIONS}/${encodeURIComponent(conversationId)}`;
 }
 
-/** `ConversationResponse` for one session — the SWR key for `useConversation`. */
+/** `ConversationResponse` for one session, shared by the catalog and detail readers. */
 export function conversationPath(conversationId: string): string {
   return `${agentSessionPath(conversationId)}/projection`;
 }
@@ -260,15 +254,30 @@ export function olderCursor(oldest: StoredMessage | undefined): string | undefin
 
 // ── Reads ────────────────────────────────────────────────────────
 
-export function fetchConversations(
-  cursor?: string,
-  limit = CONVERSATION_PAGE_SIZE,
-): Promise<Paginated<Conversation>> {
-  return api<Paginated<Conversation>>(conversationsPath(cursor, limit));
+export type SessionReadOptions = Pick<RequestOptions, 'expectedEpoch' | 'signal'>;
+export interface ConversationListOptions extends SessionReadOptions {
+  expectedEpoch: number;
+  cursor?: string;
+  limit?: number;
 }
 
-export function fetchConversation(conversationId: string): Promise<Conversation> {
-  return api<Conversation>(conversationPath(conversationId));
+export async function fetchConversationPage(
+  path: string,
+  options: SessionReadOptions & { expectedEpoch: number },
+): Promise<Paginated<Conversation>> {
+  return conversationListResponse(await api<unknown>(path, options));
+}
+
+export function fetchConversations(options: ConversationListOptions): Promise<Paginated<Conversation>> {
+  const { cursor, limit, ...request } = options;
+  return fetchConversationPage(conversationsPath(cursor, limit), request);
+}
+
+export async function fetchConversation(
+  conversationId: string,
+  options: SessionReadOptions = {},
+): Promise<Conversation> {
+  return conversationResponse(await api<unknown>(conversationPath(conversationId), options), 'conversation', conversationId);
 }
 
 export function fetchMessages(
@@ -279,164 +288,39 @@ export function fetchMessages(
   return api<Paginated<StoredMessage>>(messagesPath(conversationId, cursor, pageSize));
 }
 
-// ── Create (official template → preset → AgentSession) ───────────
+// ── Create ─────────────────────────────────────────────────────────
 
-interface AgentPresetTemplate {
-  template_key: string;
-  seed?: { required_resource_kinds?: unknown };
-}
-
-interface AgentPresetLibrary {
-  official_templates?: AgentPresetTemplate[];
-  user_presets?: { preset_id: string }[];
-}
-
-interface AgentPresetEditorResponse {
-  preset?: { preset_id?: string };
-}
-
-interface CreateSessionResponse {
-  agent_session_id: string;
-}
-
-/** Templates preferred for a plain chat session, in order. */
-const CHAT_TEMPLATE_KEYS = ['assistant.general', 'chat.minimal'] as const;
-
-/**
- * The server does NOT fall back to the global default at send time — a session
- * created without a model may reject every turn. Mirror the desktop: resolve
- * the default client-side and stamp it into the create payload.
- */
-async function resolveDefaultChatModel(): Promise<ModelRef | undefined> {
-  let saved: ModelRef | undefined;
-  try {
-    const map = await api<Record<string, unknown>>('/api/settings/client');
-    const raw = map?.['nomi.defaultModel'];
-    if (raw && typeof raw === 'object') {
-      const { provider_id, model } = raw as Record<string, unknown>;
-      if (typeof provider_id === 'string' && provider_id && typeof model === 'string' && model) {
-        saved = { provider_id, model };
-      }
-    }
-  } catch {
-    // fall through to task resolution
-  }
-
-  try {
-    const providers = await listProviders();
-    // Do not stamp a disabled/deleted/non-chat reference into a new session.
-    // If it is still runnable, preserve the user's explicit default.
-    if (isUsableModelRef(providers, saved, 'chat')) return saved;
-    return firstUsableModel(providers, 'chat');
-  } catch {
-    // A transient catalog failure must not erase a valid saved reference. The
-    // server will still validate it when the first message is sent.
-    return saved;
-  }
-}
-
-/**
- * AgentSessions are bound to a Preset, not created ad hoc. `reuse_existing`
- * makes the official template idempotent: the desktop materializes it once and
- * every later launch — desktop or phone — reuses the same preset.
- */
-async function ensureChatPreset(
-  model: ModelRef | undefined,
-  displayName: string,
-): Promise<{ presetId: string; resourceSelections: AgentResourceSelection[] }> {
-  const library = await api<AgentPresetLibrary>(
-    '/api/agent-preset-templates?source=official',
-  );
-  const templates = library.official_templates ?? [];
-  const template =
-    templates.find((t) => t.template_key === CHAT_TEMPLATE_KEYS[0]) ??
-    templates.find((t) => t.template_key === CHAT_TEMPLATE_KEYS[1]) ??
-    templates[0];
-  if (!template) {
-    throw new Error('The desktop reports no official Agent templates');
-  }
-  const resources = resolveRequiredResourceSelections(template.seed?.required_resource_kinds);
-  if (!resources) {
-    throw new Error(i18n.t('create.resourceManifestUnavailable', { ns: 'sessions' }));
-  }
-  if (resources.missingKinds.length > 0) {
-    throw new Error(i18n.t('create.resourceSelectionRequired', {
-      ns: 'sessions', kinds: resources.missingKinds.join(', '),
-    }));
-  }
-  const editor = await api<AgentPresetEditorResponse>(
-    `/api/agent-presets/from-template/${encodeURIComponent(template.template_key)}`,
-    {
-      body: {
-        display_name: displayName,
-        model_route_refs: {},
-        chat_route_records: {},
-        reuse_existing: true,
-        ...(model ? { model: { provider_id: model.provider_id, model: model.model } } : {}),
-      },
-    },
-  );
-  const presetId = editor.preset?.preset_id;
-  if (!presetId) {
-    throw new Error('The desktop did not materialize an Agent preset');
-  }
-  return { presetId, resourceSelections: resources.selections };
-}
-
-export interface CreateConversationOptions {
-  /**
-   * Absolute directory on the desktop machine — supplying it freezes a
-   * Workspace resource binding (`extra.workspace`). It must come from
-   * `GET /api/fs/browse`; the server canonicalizes the path itself and rejects
-   * a non-directory.
-   */
-  workspace?: string;
-  /** Display name for the materialized official Agent preset. */
-  agentDisplayName?: string;
-}
-
-/**
- * `POST /api/agent-sessions` —
- * `{preset_id, title?, model?, resource_selections?, workspace?}`.
- * The response only carries the id + binding, so the projected row is fetched
- * separately (what the desktop does immediately after create as well).
- */
-export async function createConversation(
-  name?: string,
-  options: CreateConversationOptions = {},
-): Promise<Conversation> {
-  const model = await resolveDefaultChatModel();
-  // Trim like the desktop's picker does: a stray edge space is rejected as
-  // WORKSPACE_PATH_EDGE_WHITESPACE.
-  const workspace = options.workspace?.trim();
-  const { presetId, resourceSelections } = await ensureChatPreset(model, options.agentDisplayName ?? 'Nomi');
-  const created = await api<CreateSessionResponse>(AGENT_SESSIONS, {
-    body: {
-      preset_id: presetId,
-      ...(name ? { title: name } : {}),
-      ...(model ? { model: { provider_id: model.provider_id, model: model.model } } : {}),
-      ...(resourceSelections.length > 0 ? { resource_selections: resourceSelections } : {}),
-      // The workspace selection admits the capability first; the desktop then
-      // validates and freezes this user-selected directory into that binding.
-      ...(workspace ? { workspace } : {}),
-    },
-    headers: { 'Idempotency-Key': newIdempotencyKey() },
-  });
-  return fetchConversation(created.agent_session_id);
-}
+/** All creation entry points use the same connection-bound commit command. */
+export const createConversation = createConversationCommand(api, connectionStore.epoch);
 
 // ── Metadata / lifecycle ─────────────────────────────────────────
 
 /** `NomiCoreSessionMetadataUpdate` — presentation metadata only. */
-export function patchConversation(
+export async function patchConversation(
   conversationId: string,
   updates: { name?: string; pinned?: boolean; archived?: boolean },
-): Promise<unknown> {
-  return api<unknown>(agentSessionPath(conversationId), { method: 'PATCH', body: updates });
+  options: SessionReadOptions = {},
+): Promise<Conversation> {
+  return conversationResponse(await api<unknown>(agentSessionPath(conversationId), {
+    ...options, method: 'PATCH', body: updates,
+  }), 'conversation', conversationId);
 }
 
-export function deleteConversation(conversationId: string): Promise<unknown> {
-  return api<unknown>(agentSessionPath(conversationId), { method: 'DELETE' });
+export function deleteConversation(conversationId: string, options: SessionReadOptions = {}): Promise<unknown> {
+  return api<unknown>(agentSessionPath(conversationId), { ...options, method: 'DELETE' });
+}
+
+/** Model changes return the same authoritative projection as metadata writes. */
+export async function patchConversationModel(
+  conversationId: string,
+  option: { providerId: string; model: string },
+  options: SessionReadOptions = {},
+): Promise<Conversation> {
+  return conversationResponse(await api<unknown>(`${agentSessionPath(conversationId)}/model`, {
+    ...options,
+    method: 'PUT',
+    body: { provider_id: option.providerId, model: option.model },
+  }), 'conversation', conversationId);
 }
 
 // ── Turns ────────────────────────────────────────────────────────

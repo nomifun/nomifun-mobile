@@ -1,11 +1,5 @@
 # Testing & verification
 
-2026-10-07: The user explicitly authorized this task's commit and push in both
-repositories, superseding the earlier acceptance-before-Git restriction.
-Pending cloud, native-host, physical-device/acoustic, Swift and human
-acceptance remains pending. This authorization does not permit PR creation,
-publishing, deployment, visible GUI or installing/running a native app.
-
 Three gates, in the order of how often you should run them:
 
 | Command | Needs a backend? | What it proves |
@@ -17,6 +11,53 @@ Three gates, in the order of how often you should run them:
 | `bun run e2e:project` | **yes** | the whole project-session flow works |
 | `node --test scripts/voice-web-server.test.mjs` | isolated fixtures | Node static/API/WS boundaries and owned shutdown; no cloud/device proof |
 | `node e2e/voice-web.mjs` (`e2e:voice-web`) | **fresh isolated API-only host** | source-bound RN Web UI plus browser synthetic-media contracts; see the dedicated procedure below |
+
+## Session data and Android module identity
+
+```sh
+bun test tests/session-commands.test.ts tests/session-wire.test.ts tests/session-data.test.ts tests/session-sync.test.ts src/features/sessions/__tests__/catalog.test.ts src/features/sessions/__tests__/presentation.test.ts tests/cache-module-identity.test.mjs tests/transport-client.test.ts
+bun run typecheck
+bun run typecheck:e2e-sessions
+bun run check:i18n
+bun run check:cache-modules
+```
+
+The cache-module test uses the real Metro resolver and real React provider hooks
+in a separate Node process. It reproduces the original ESM/CJS context split,
+then checks that public SWR entries share fetcher, cache and mutate under the
+project configuration. A source-only Node import test cannot detect this native
+resolution problem.
+
+After native bundling changes, clear Metro and inspect the emitted graph:
+
+```sh
+CI=1 EXPO_OFFLINE=1 bunx expo export --platform android --clear --no-bytecode --source-maps --output-dir /tmp/nomifun-session-android
+node scripts/check-cache-module-graph.mjs --source-map /tmp/nomifun-session-android/_expo/static/js/android/entry-HASH.js.map
+```
+
+The map must contain one SWR config context. Bytecode/JS export checks do not
+replace installing a rebuilt APK and accepting the flow on a physical device.
+
+Real HTTP acceptance requires a separate fresh API-only host with data, work,
+cache and log directories isolated under a new temporary directory:
+
+```sh
+bun run e2e:sessions -- --backend-url http://127.0.0.1:PORT --data-dir /tmp/NEW-DIRECTORY/data
+```
+
+The script checks loopback, the process announcement, the exact reported data
+directory, new-installation state and the absence of configured providers before
+writing. It exercises the real Mobile transport, creation command, wire validators
+and shared owner: empty list, committed create, manual refresh, pagination,
+metadata synchronization and deletion. No Turn or model request is sent. The
+report defaults to `.tmp-e2e/session-data/report.json`; only its own Session IDs
+are cleanup candidates. A host without native cleanup support may reject deletion
+with `AGENT_SESSION_BROWSER_CLEANUP_UNAVAILABLE`; that remains an explicit failed
+real-host check, never a simulated success or reason to bypass cleanup.
+
+Browser acceptance must check that a known created Session returns to the list,
+remains after manual refresh and reload, appears once, and has no permanent
+"loading more" indicator. A load-error message is not a settled success state.
 
 Connection changes have a focused offline gate:
 

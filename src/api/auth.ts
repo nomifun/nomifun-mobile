@@ -60,7 +60,6 @@ async function persistLogin(baseUrl: string, res: AuthLoginResponse, desktop: De
     device: res.device,
     routeKind: Platform.OS === 'web' ? 'site' : isLocalConnectionAddress(baseUrl) ? 'direct' : 'relay',
     routes: [{ baseUrl, kind: Platform.OS === 'web' ? 'site' : isLocalConnectionAddress(baseUrl) ? 'direct' : 'relay' }],
-    contractVersion: desktop.protocol_version,
   }, false, expectedEpoch);
   if (!connected) throw new StaleConnectionError();
   // Keep the redeemed credential for an explicit retry when the network disappears here.

@@ -9,7 +9,9 @@ import { useTheme } from '@/hooks/use-theme';
 import { a11yState } from '@/utils/a11y';
 
 import type { Conversation } from '../api';
-import { patchConversationModel, useModelOptions } from '../model-options';
+import { useModelOptions } from '../model-options';
+import { useSessionList } from '../list-context';
+import { isStaleSessionError, sessionErrorText } from '../errors';
 import { isSameModel, type ModelGroup } from '../model-switch';
 
 interface ModelSheetProps {
@@ -35,6 +37,7 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
   const { t } = useTranslation('sessions');
   const { t: tc } = useTranslation('common');
   const options = useModelOptions(conversation, visible);
+  const sessions = useSessionList();
   const [saving, setSaving] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState('');
 
@@ -54,16 +57,18 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
     setSaving(key);
     setInlineError('');
     try {
-      await patchConversationModel(conversation.conversation_id, {
+      await sessions.setModel(conversation.conversation_id, {
         providerId: group.providerId,
         model,
       });
+      if (!sessions.isCurrent()) return;
       onChanged();
       onClose();
       toast.success(t('model.switched', { model: group.labels?.[model] ?? model }));
     } catch (error) {
+      if (!sessions.isCurrent() || isStaleSessionError(error)) return;
       const message = t('model.switchFailed', {
-        message: error instanceof Error ? error.message : tc('feedback.requestFailed'),
+        message: sessionErrorText(error, tc('feedback.requestFailed')),
       });
       setInlineError(message);
       toast.error(message);

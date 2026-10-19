@@ -16,7 +16,8 @@
     "waiting": "Needs review",
     "untitled": "Untitled session",
     "createFailed": "Could not create the session: {{message}}",
-    "wsOffline": "Realtime connection lost — reconnecting…"
+    "wsOffline": "Realtime connection lost — reconnecting…",
+    "noLoadedMatches": "No matches in the loaded conversations"
   },
   "create": {
     "action": "New session",
@@ -52,7 +53,8 @@
     "typing": "Generating a reply…",
     "stopped": "Generation stopped",
     "cannotSend": "The agent is busy — try again in a moment",
-    "desktopOnlyHint": "Workspace, terminal and approvals live on the desktop app."
+    "desktopOnlyHint": "Workspace, terminal and approvals live on the desktop app.",
+    "sessionLoadFailed": "Conversation information could not be loaded"
   },
   "message": {
     "thinking": "Thinking…",
@@ -148,5 +150,10 @@
     "loadFailed": "Could not read the model catalog",
     "emptyTitle": "No chat model available",
     "emptyHint": "Add a provider under Tools & services → Models, or configure one on the desktop."
+  },
+  "errors": {
+    "protocol": "The Desktop returned incompatible session data. Check the Mobile and Desktop versions, then retry.",
+    "creating": "A conversation is being created. Please wait.",
+    "pendingCreation": "Several creation results are still unconfirmed. Retry an unfinished creation first."
   }
 }

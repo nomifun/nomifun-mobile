@@ -7,8 +7,7 @@
  * `@/features/sessions/api` (`createConversation`); this module owns the
  * read-only workspace listing on an existing row.
  *
- * Wire truth: docs/research/project-sessions.md §3 and
- * docs/research/workspace-runtime.md §3.
+ * Wire contract: docs/PROJECT-SESSIONS-CONTRACT.md.
  */
 import { api } from '@/api/client';
 import { agentSessionPath } from '@/features/sessions/api';

@@ -171,7 +171,6 @@ are maintained centrally in the [NomiFun Portal](https://www.nomifun.com/docs/):
 - [Desktop Connections & Devices guide](https://github.com/nomifun/nomifun-desktop/blob/main/docs/guides/webui-remote-access.md)
 - [WebSocket protocol research](docs/research/ws-protocol.md)
 - [Filesystem browse API](docs/research/fs-browse-api.md)
-- [Workspace runtime](docs/research/workspace-runtime.md)
 - [Testing](docs/TESTING.md)
 
 ## ⚖️ License

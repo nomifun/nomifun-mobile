@@ -2,10 +2,8 @@
  * Create a project session: pick a directory on the desktop machine, name the
  * session, POST it, land in the chat.
  *
- * Why "pick", never "type": the create endpoint does not check that the path
- * exists (no canonicalize, no mkdir, no `~` expansion), so a wrong path builds a
- * conversation that only explodes when the first message spawns the agent. The
- * path therefore always comes from `/api/fs/browse` via the picker.
+ * The picker obtains a real server directory; creation canonicalizes and
+ * validates it before freezing the session's workspace binding.
  */
 import { useCallback, useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -17,11 +15,9 @@ import { hasEdgeWhitespaceSegment, isRiskyWorkspacePath } from '@/features/fs/ap
 import { DirectoryField } from '@/features/projects/components/directory-field';
 import { RiskyPathNotice } from '@/features/projects/components/risky-path-notice';
 import { workspaceErrorMessage } from '@/features/projects/errors';
-import {
-  invalidateConversationLists,
-  useRecentProjectDirectories,
-} from '@/features/projects/hooks';
-import { createConversation } from '@/features/sessions/api';
+import { useRecentProjectDirectories } from '@/features/projects/hooks';
+import { useSessionList } from '@/features/sessions/list-context';
+import { isStaleSessionError, sessionErrorText } from '@/features/sessions/errors';
 import { DEFAULT_WORKPATH_KEY, workspaceDisplayName } from '@/features/sessions/workpath';
 
 /** `?workspace=` prefill, sent by the "+" on a project group in the list. */
@@ -45,6 +41,7 @@ export default function NewProjectSessionScreen() {
   const { t } = useTranslation('project');
   const { t: tc } = useTranslation('common');
   const params = useLocalSearchParams<{ workspace?: string }>();
+  const sessions = useSessionList();
 
   const [workspace, setWorkspace] = useState(() => initialWorkspace(params.workspace));
   const [name, setName] = useState(() => defaultSessionName(initialWorkspace(params.workspace)));
@@ -54,13 +51,11 @@ export default function NewProjectSessionScreen() {
   const [directoryError, setDirectoryError] = useState<string | undefined>(undefined);
   /** Armed by the first tap on a risky path — a soft gate, not a block. */
   const [riskArmed, setRiskArmed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const submitting = sessions.creating;
 
   /**
    * Directories the user already runs project sessions in, offered on the
-   * picker's start screen. Derived from `GET /api/agent-sessions` rather than
-   * remembered locally, so it matches the desktop and every other device — and
-   * only fetched while the picker is open.
+   * picker's start screen, derived from the shared loaded session window.
    */
   const recentDirectories = useRecentProjectDirectories(
     (name) => t('create.recentDirectory', { name }),
@@ -93,15 +88,14 @@ export default function NewProjectSessionScreen() {
       setRiskArmed(true);
       return;
     }
-    setSubmitting(true);
     try {
       // CreateAgentSessionRequestDto carries {preset_id, title?, model?,
       // workspace?} — the directory is frozen into the session's Workspace
       // binding here. An empty name falls back to the basename so the field
       // hint stays true (the server would otherwise mint its own default).
       const fallbackName = name.trim() || defaultSessionName(workspace);
-      const created = await createConversation(fallbackName || undefined, { workspace });
-      invalidateConversationLists();
+      const created = await sessions.create(fallbackName || undefined, { workspace });
+      if (!sessions.isCurrent() || created.epoch !== sessions.epoch) return;
       toast.success(t('create.created'));
       if (created?.conversation_id) {
         router.replace(`/session/${created.conversation_id}`);
@@ -109,19 +103,18 @@ export default function NewProjectSessionScreen() {
         router.back();
       }
     } catch (error) {
+      if (!sessions.isCurrent() || isStaleSessionError(error)) return;
       toast.error(
         t('create.failed', {
           message: workspaceErrorMessage(error, {
             edgeWhitespace: t('errors.edgeWhitespace'),
             notOwner: t('errors.notOwner'),
-            fallback: tc('feedback.requestFailed'),
+            fallback: sessionErrorText(error, tc('feedback.requestFailed')),
           }),
         }),
       );
-    } finally {
-      setSubmitting(false);
     }
-  }, [name, risky, riskArmed, submitting, t, tc, workspace]);
+  }, [name, risky, riskArmed, sessions, submitting, t, tc, workspace]);
 
   return (
     <Screen keyboardAvoiding>

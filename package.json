@@ -65,7 +65,10 @@
     "export:web": "expo export -p web",
     "voice:web:export": "bun scripts/voice-web-export.mjs",
     "e2e:voice-web": "node e2e/voice-web.mjs",
-    "test:voice-web-server": "node --test scripts/voice-web-server.test.mjs"
+    "test:voice-web-server": "node --test scripts/voice-web-server.test.mjs",
+    "check:cache-modules": "node scripts/check-cache-module-graph.mjs",
+    "e2e:sessions": "bun e2e/sessions-contract.mts",
+    "typecheck:e2e-sessions": "tsc -p e2e/tsconfig.sessions-contract.json"
   },
   "private": true,
   "patchedDependencies": {

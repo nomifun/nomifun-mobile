@@ -74,8 +74,6 @@ export interface ServerBinding {
   /** 30-day JWT from qr-login / password login. */
   token: string;
   user: AuthUser | null;
-  /** ui-api-contract-version reported by the server, if known. */
-  contractVersion?: number;
   desktop?: DesktopConnectionInfo;
   system?: DesktopSystemInfo;
   device?: ConnectedDevice;

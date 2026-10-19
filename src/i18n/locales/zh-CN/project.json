@@ -6,7 +6,7 @@
     "pick": "选择工作目录",
     "change": "更换目录",
     "unselectedTitle": "尚未选择目录",
-    "unselectedHint": "选一个桌面端机器上的目录；创建后还可以更换。",
+    "unselectedHint": "选择桌面端机器上的目录；该会话创建后工作目录固定。",
     "nameLabel": "会话名称",
     "namePlaceholder": "默认使用目录名",
     "nameHint": "留空则用目录名。",
@@ -36,14 +36,7 @@
     "copy": "复制路径",
     "projectHint": "智能体将以此目录为主工作区，并可在其中读写文件。",
     "temporaryHint": "这是桌面端自动分配的临时目录，由桌面端创建和管理。临时会话不能改绑到项目目录——需要固定目录请新建一个项目会话。",
-    "change": "更换工作目录",
-    "browse": "浏览项目文件",
-    "changeTitle": "更换工作目录？",
-    "changeBody": "新目录：{{path}}\n\n更换会重启该会话的智能体，下一条消息生效。",
-    "changeRisky": "注意：这是系统目录或可能存放凭证的敏感目录。",
-    "changeConfirm": "更换",
-    "changed": "已更换工作目录，下一条消息生效",
-    "changeFailed": "更换失败：{{message}}"
+    "browse": "浏览项目文件"
   },
   "files": {
     "title": "项目文件",

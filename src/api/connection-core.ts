@@ -55,7 +55,7 @@ export function createConnectionStore(persistence: ConnectionPersistence, sameOr
       return run(async () => {
         if (state.phase !== 'connected' || state.epoch !== expectedEpoch) return false;
         const before = state.binding;
-        const binding = { ...before, desktop, system, contractVersion: desktop.protocol_version };
+        const binding = { ...before, desktop, system };
         const changed = connectionNamespace(before) !== connectionNamespace(binding);
         await persistence.write(binding);
         const epoch = state.epoch + Number(changed);

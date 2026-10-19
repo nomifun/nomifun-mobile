@@ -4,6 +4,32 @@ import { createTransportClient } from '@/api/transport-client';
 const binding = { baseUrl: 'https://desktop-a.test', token: 'a', user: { user_id: 'u', username: 'U' } };
 const storeFactory = () => createConnectionStore({ read: async () => null, write: async () => undefined });
 
+test('invalid successful JSON and non-envelope bodies fail instead of becoming apparent empty data', async () => {
+  for (const body of ['', '<html>proxy failure</html>', '{}', '[]', '{"success":"true","data":[]}']) {
+    const store = storeFactory(); await store.connect(binding);
+    const client = createTransportClient({ ...store, fetch: (async () => new Response(body, { status: 200 })) as typeof fetch });
+    expect(await client.api('/api/agent-sessions').catch(error => error.code)).toBe('INVALID_API_RESPONSE');
+  }
+});
+
+test('empty mutation receipts and an explicit null data value remain valid', async () => {
+  const store = storeFactory(); await store.connect(binding);
+  let body = { success: true } as { success: boolean; data?: null };
+  const client = createTransportClient({ ...store, fetch: (async () => Response.json(body)) as typeof fetch });
+  expect(await client.api('/api/providers/example', { method: 'DELETE' })).toBe(undefined);
+  body = { success: true, data: null };
+  expect(await client.api('/api/fs/read', { body: { path: 'empty' } })).toBe(null);
+});
+
+test('an actual 204 mutation succeeds while a 200 null envelope remains a protocol error', async () => {
+  const store = storeFactory(); await store.connect(binding);
+  let response = new Response(null, { status: 204 });
+  const client = createTransportClient({ ...store, fetch: (async () => response) as typeof fetch });
+  expect(await client.api('/api/companions/example', { method: 'DELETE' })).toBe(undefined);
+  response = Response.json(null);
+  expect(await client.api('/api/agent-sessions').catch(error => error.code)).toBe('INVALID_API_RESPONSE');
+});
+
 test('explicit address discovery never sends an existing Desktop credential', async () => {
   const store = storeFactory(); await store.connect(binding);
   let authorization: string | null = 'unset';

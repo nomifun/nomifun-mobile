@@ -21,7 +21,7 @@ import { assert, env, finish, launch, login, openTab, seen, step, ui } from './l
  * a legitimate settled state — loaded, empty, or failed-with-retry.
  */
 const SURFACES = [
-  { tab: ui.tabs.sessions, marker: /还没有会话|会话列表加载失败|\d+ 个会话/ },
+  { tab: ui.tabs.sessions, marker: /还没有会话|\d+ 个会话/ },
   { tab: ui.tabs.tasks, marker: /暂无定时任务|没有匹配的定时任务|任务列表|新建定时任务|下次运行/ },
   { tab: ui.tabs.requirements, marker: /还没有需求|没有符合条件的需求|新建需求|待执行/ },
   { tab: ui.tabs.companions, marker: /还没有桌面伙伴|读取伙伴列表失败|新建伙伴|位伙伴/ },
@@ -45,6 +45,10 @@ for (const surface of SURFACES) {
   await step(page, `${surface.tab} tab settles`, async () => {
     await openTab(page, surface.tab);
     await seen(page.getByText(surface.marker), `a settled ${surface.tab} screen`);
+    if (surface.tab === ui.tabs.sessions) {
+      assert(!(await page.getByText('会话列表加载失败', { exact: true }).isVisible().catch(() => false)), 'session query failed');
+      await page.getByText('正在加载更多…', { exact: true }).waitFor({ state: 'hidden' });
+    }
     // A spinner still on screen after the marker means the screen is half-built.
     const loading = page.getByText('加载中…').first();
     if (await loading.isVisible().catch(() => false)) {

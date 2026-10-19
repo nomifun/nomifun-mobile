@@ -13,14 +13,15 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
-import { api } from '@/api/client';
 import { connectionStore } from '@/api/connection';
 import { useConnection } from '@/hooks/use-connection';
 import { Button, Screen } from '../components/VoiceUI';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { a11yState } from '@/utils/a11y';
-import { conversationsPath, type Conversation, type Paginated } from '@/features/sessions/api';
+import { useSessionList } from '@/features/sessions/list-context';
+import { useSessionDetail } from '@/features/sessions/provider';
+import { sessionErrorText } from '@/features/sessions/errors';
 import {
   operationIdentity,
   probeVoiceProfile,
@@ -57,9 +58,8 @@ export default function VoiceScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [configuring, setConfiguring] = useState(false);
-  const { data: sessions } = useSWR(owner ? ['voice-sessions', owner] : null, () =>
-    api<Paginated<Conversation>>(conversationsPath(undefined, 100)),
-  );
+  const sessions = useSessionList();
+  const selectedSession = useSessionDetail(session);
   const { data: catalog, error: catalogError } = useSWR(
     owner ? ['voice-catalog', owner] : null,
     voiceCatalog,
@@ -108,7 +108,7 @@ export default function VoiceScreen() {
         current,
         voiceTransports,
         session,
-        sessions?.items.find((value) => value.conversation_id === session)?.name ?? session,
+        selectedSession.data?.name ?? session,
       );
       await voiceController.start(binding, takeover);
     });
@@ -146,7 +146,7 @@ export default function VoiceScreen() {
   const server = connectionStore.binding()?.baseUrl || t('pairedDesktop');
   const title =
     bound?.label ??
-    sessions?.items.find((value) => value.conversation_id === session)?.name ??
+    selectedSession.data?.name ??
     t('selectSession');
   const sourceContext = snapshot.sourceContextRequirement;
   const sourceContextText = sourceContext && voiceController.sourceContextText(sourceContext);
@@ -327,7 +327,7 @@ export default function VoiceScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.pills}
           >
-            {sessions?.items.map((value) => (
+            {sessions.items.map((value) => (
               <Pressable
                 key={value.conversation_id}
                 accessibilityRole="button"
@@ -361,6 +361,17 @@ export default function VoiceScreen() {
               </Pressable>
             ))}
           </ScrollView>
+          {sessions.error ? (
+            <Text style={[styles.hint, { color: colors.danger }]}>
+              {sessionErrorText(sessions.error, t('list.loadFailed', { ns: 'sessions' }))}
+            </Text>
+          ) : null}
+          {sessions.error || sessions.hasMore ? (
+            <Button small variant="ghost" disabled={sessions.isLoadingMore || sessions.isRefreshing}
+              onPress={() => { if (sessions.error) sessions.retry(); else void sessions.loadMore(); }}>
+              {sessions.error ? t('actions.retry', { ns: 'common' }) : t('navigation.loadMore', { ns: 'common' })}
+            </Button>
+          ) : null}
           <View style={styles.sectionHeading}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('profile')}</Text>
             <Button small variant="ghost" onPress={() => setConfiguring(!configuring)}>
