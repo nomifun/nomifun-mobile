@@ -153,8 +153,6 @@
     "title": "添加供应商",
     "platform": "平台",
     "platformHint": "选择预设平台会自动填好接口地址；聚合网关请选 New API 或 Custom。",
-    "showAllPlatforms": "显示全部平台",
-    "showCommonPlatforms": "仅显示常用平台",
     "nameHint": "在应用内显示的名称。",
     "moreModels": "还有 {{count}} 个未显示，输入关键字筛选",
     "keyRequired": "请填写 API 密钥",

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Button, TextField } from '@/components/ui';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { Button, Select, TextField } from '@/components/ui';
+import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   AUTH_SCHEME_PRESETS,
@@ -16,7 +16,6 @@ import { saveProviderConnection } from '@/features/models/api';
 import { errorMessage } from '@/features/models/errors';
 import { Sheet } from '@/components/ui/sheet';
 import type { ProviderConnectionResponse } from '@/features/models/types';
-import { a11yState } from '@/utils/a11y';
 
 const CUSTOM_SCHEME = '__custom__';
 
@@ -190,65 +189,20 @@ export function ProviderConnectionSheet({
         error={error === t('connections.baseUrlRequired') ? error : undefined}
       />
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {t('connections.authScheme')}
-      </Text>
-      <View style={styles.chips}>
-        {schemeOptions.map((option) => {
-          const active = schemeChoice === option;
-          return (
-            <Pressable
-              key={option}
-              accessibilityRole="button"
-              disabled={saving}
-              {...a11yState({ selected: active, disabled: saving })}
-              onPress={() => {
-                setSchemeChoice(option);
-                if (option !== CUSTOM_SCHEME) setCustomScheme('');
-                setError('');
-              }}
-              style={[
-                styles.chip,
-                {
-                  borderColor: active ? colors.primary : colors.border,
-                  backgroundColor: active ? colors.primarySoft : colors.surface,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.chipText, { color: active ? colors.primary : colors.textSecondary }]}
-              >
-                {option}
-              </Text>
-            </Pressable>
-          );
-        })}
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          {...a11yState({ selected: schemeChoice === CUSTOM_SCHEME, disabled: saving })}
-          onPress={() => {
-            setSchemeChoice(CUSTOM_SCHEME);
-            setError('');
-          }}
-          style={[
-            styles.chip,
-            {
-              borderColor: schemeChoice === CUSTOM_SCHEME ? colors.primary : colors.border,
-              backgroundColor: schemeChoice === CUSTOM_SCHEME ? colors.primarySoft : colors.surface,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.chipText,
-              { color: schemeChoice === CUSTOM_SCHEME ? colors.primary : colors.textSecondary },
-            ]}
-          >
-            {t('connections.authSchemeCustom')}
-          </Text>
-        </Pressable>
-      </View>
+      <Select
+        label={t('connections.authScheme')}
+        value={schemeChoice}
+        options={[
+          ...schemeOptions.map((option) => ({ value: option, label: option })),
+          { value: CUSTOM_SCHEME, label: t('connections.authSchemeCustom') },
+        ]}
+        onChange={(option) => {
+          setSchemeChoice(option);
+          if (option !== CUSTOM_SCHEME) setCustomScheme('');
+          setError('');
+        }}
+        disabled={saving}
+      />
       {schemeChoice === CUSTOM_SCHEME ? (
         <TextField
           label={t('connections.authSchemeCustom')}
@@ -323,16 +277,6 @@ export function ProviderConnectionSheet({
 
 const styles = StyleSheet.create({
   label: { fontSize: FontSize.sm, fontWeight: '600', marginBottom: Spacing.xs },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.md },
-  chip: {
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipText: { fontSize: FontSize.sm, fontWeight: '600' },
   credentialGroup: { gap: Spacing.xs },
   error: { fontSize: FontSize.sm, lineHeight: 19, marginBottom: Spacing.sm },
 });

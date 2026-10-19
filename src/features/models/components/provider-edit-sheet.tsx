@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Button, TextField } from '@/components/ui';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { Button, Select, TextField } from '@/components/ui';
+import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { a11yState } from '@/utils/a11y';
 import { updateProvider } from '@/features/models/api';
@@ -181,39 +181,16 @@ export function ProviderEditSheet({ visible, provider, onClose, onSaved }: Provi
 
       {isBedrock ? (
         <>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('provider.bedrockAuthMethod')}
-          </Text>
-          <View style={styles.chips}>
-            {BEDROCK_AUTH_METHODS.map((method) => {
-              const active = method === bedrockAuthMethod;
-              return (
-                <Pressable
-                  key={method}
-                  accessibilityRole="button"
-                  disabled={saving}
-                  {...a11yState({ selected: active, disabled: saving })}
-                  onPress={() => setBedrockAuthMethod(method)}
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primarySoft : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? colors.primary : colors.textSecondary },
-                    ]}
-                  >
-                    {t(`provider.bedrockAuth.${method}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Select
+            label={t('provider.bedrockAuthMethod')}
+            value={bedrockAuthMethod}
+            options={BEDROCK_AUTH_METHODS.map((method) => ({
+              value: method,
+              label: t(`provider.bedrockAuth.${method}`),
+            }))}
+            onChange={setBedrockAuthMethod}
+            disabled={saving}
+          />
           <TextField
             label={t('provider.bedrockRegion')}
             value={bedrockRegion}
@@ -293,17 +270,6 @@ export function ProviderEditSheet({ visible, provider, onClose, onSaved }: Provi
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: FontSize.sm, fontWeight: '600', marginBottom: Spacing.xs },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.md },
-  chip: {
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipText: { fontSize: FontSize.sm, fontWeight: '600' },
   link: { fontSize: FontSize.sm, fontWeight: '600', paddingVertical: Spacing.xs },
   error: { fontSize: FontSize.sm, lineHeight: 19, marginBottom: Spacing.sm },
 });

@@ -51,6 +51,13 @@
     "showPassword": "显示密码",
     "hidePassword": "隐藏密码"
   },
+  "select": {
+    "valueLabel": "{{label}}：{{value}}",
+    "placeholder": "请选择",
+    "searchPlaceholder": "搜索选项",
+    "searchLabel": "搜索{{label}}",
+    "noResults": "没有匹配的选项"
+  },
   "state": {
     "loading": "加载中…",
     "empty": "暂无数据",

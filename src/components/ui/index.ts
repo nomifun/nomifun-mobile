@@ -9,6 +9,7 @@ export { Avatar, ListRow } from './list-row';
 export { Notice } from './notice';
 export { PageHeading } from './page-heading';
 export { Screen } from './screen';
+export { Select, MultiSelect, type SelectOption } from './select';
 export { SegmentedControl, type SegmentOption } from './segmented-control';
 export { Sheet, type SheetProps } from './sheet';
 export { SearchField, TextField } from './text-field';

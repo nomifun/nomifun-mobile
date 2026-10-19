@@ -51,6 +51,13 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password"
   },
+  "select": {
+    "valueLabel": "{{label}}: {{value}}",
+    "placeholder": "Select an option",
+    "searchPlaceholder": "Search options",
+    "searchLabel": "Search {{label}}",
+    "noResults": "No matching options"
+  },
   "state": {
     "loading": "Loading…",
     "empty": "Nothing here yet",

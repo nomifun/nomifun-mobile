@@ -4,7 +4,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Card, Tag, TextField } from '@/components/ui';
+import { Button, Card, MultiSelect, Select, Tag, TextField } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import {
   CAPABILITY_ENDPOINT_FIELDS,
@@ -224,42 +224,14 @@ export function ModelDefinitionEditor({
     <View style={styles.root}>
       {!modelReadOnly ? (
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('editor.primaryTask')}
-          </Text>
-          <Text style={[styles.hint, { color: colors.textTertiary }]}>
-            {t('editor.primaryTaskHint')}
-          </Text>
-          <View style={styles.chips}>
-            {MODEL_TASK_ORDER.map((task) => {
-              const active = task === primaryTask;
-              return (
-                <Pressable
-                  key={task}
-                  accessibilityRole="button"
-                  disabled={controlsDisabled}
-                  {...a11yState({ selected: active, disabled: controlsDisabled })}
-                  onPress={() => selectPrimaryTask(task)}
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primarySoft : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? colors.primary : colors.textSecondary },
-                    ]}
-                  >
-                    {t(`task.${task}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Select
+            label={t('editor.primaryTask')}
+            hint={t('editor.primaryTaskHint')}
+            value={primaryTask}
+            options={MODEL_TASK_ORDER.map((task) => ({ value: task, label: t(`task.${task}`) }))}
+            disabled={controlsDisabled}
+            onChange={selectPrimaryTask}
+          />
         </View>
       ) : null}
 
@@ -414,34 +386,18 @@ export function ModelDefinitionEditor({
 
       {value.capabilities.length > 0 && availableTasks.length > 0 ? (
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('editor.additionalTasks')}
-          </Text>
-          <View style={styles.chips}>
-            {availableTasks.map((task) => (
-              <Pressable
-                key={task}
-                accessibilityRole="button"
-                disabled={controlsDisabled}
-                {...a11yState({ disabled: controlsDisabled })}
-                onPress={() => {
-                  onChange((current) => ({
-                    ...current,
-                    capabilities: addCapabilityTask(current.capabilities, task),
-                  }));
-                  setExpandedTask(task);
-                }}
-                style={[
-                  styles.chip,
-                  { borderColor: colors.border, backgroundColor: colors.surface },
-                ]}
-              >
-                <Text style={[styles.chipText, { color: colors.textSecondary }]}>
-                  + {t(`task.${task}`)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <Select
+            label={t('editor.additionalTasks')}
+            options={availableTasks.map((task) => ({ value: task, label: t(`task.${task}`) }))}
+            disabled={controlsDisabled}
+            onChange={(task) => {
+              onChange((current) => ({
+                ...current,
+                capabilities: addCapabilityTask(current.capabilities, task),
+              }));
+              setExpandedTask(task);
+            }}
+          />
         </View>
       ) : null}
     </View>
@@ -624,45 +580,17 @@ function CapabilityCard({
         </View>
       ) : expanded ? (
         <View style={[styles.capabilityBody, { borderTopColor: colors.border }]}>
-          <Text style={[styles.subLabel, { color: colors.textSecondary }]}>
-            {t('editor.protocol')}
-          </Text>
           {manifest?.protocols.length ? (
-            <View style={styles.chips}>
-              {manifest.protocols.map((protocol) => {
-                const active = capability.protocol === protocol.protocol_id;
-                return (
-                  <Pressable
-                    key={protocol.protocol_id}
-                    accessibilityRole="button"
-                    disabled={loading || validationPending || disabled}
-                    {...a11yState({
-                      selected: active,
-                      disabled: loading || validationPending || disabled,
-                    })}
-                    onPress={() =>
-                      onChange(changeCapabilityProtocol(capability, protocol.protocol_id, manifest))
-                    }
-                    style={[
-                      styles.chip,
-                      {
-                        borderColor: active ? colors.primary : colors.border,
-                        backgroundColor: active ? colors.primarySoft : colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        { color: active ? colors.primary : colors.textSecondary },
-                      ]}
-                    >
-                      {protocol.protocol_id}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Select
+              label={t('editor.protocol')}
+              value={capability.protocol}
+              options={manifest.protocols.map((protocol) => ({
+                value: protocol.protocol_id,
+                label: protocol.protocol_id,
+              }))}
+              disabled={loading || validationPending || disabled}
+              onChange={(protocol) => onChange(changeCapabilityProtocol(capability, protocol, manifest))}
+            />
           ) : (
             <Text style={[styles.hint, { color: colors.danger }]}>
               {loading ? tc('state.loading') : t('editor.noProtocol')}
@@ -687,41 +615,15 @@ function CapabilityCard({
             }
           />
 
-          <Text style={[styles.subLabel, { color: colors.textSecondary }]}>
-            {t('editor.connectionRole')}
-          </Text>
-          <View style={styles.chips}>
-            {['default', ...connections.map((connection) => connection.role)]
+          <Select
+            label={t('editor.connectionRole')}
+            value={role}
+            options={['default', ...connections.map((connection) => connection.role)]
               .filter((candidate, index, candidates) => candidates.indexOf(candidate) === index)
-              .map((candidate) => {
-                const active = role === candidate;
-                return (
-                  <Pressable
-                    key={candidate}
-                    accessibilityRole="button"
-                    disabled={validationPending || disabled}
-                    {...a11yState({ selected: active, disabled: validationPending || disabled })}
-                    onPress={() => onChange({ connectionRole: candidate })}
-                    style={[
-                      styles.chip,
-                      {
-                        borderColor: active ? colors.primary : colors.border,
-                        backgroundColor: active ? colors.primarySoft : colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        { color: active ? colors.primary : colors.textSecondary },
-                      ]}
-                    >
-                      {candidate}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-          </View>
+              .map((candidate) => ({ value: candidate, label: candidate }))}
+            disabled={validationPending || disabled}
+            onChange={(connectionRole) => onChange({ connectionRole })}
+          />
           <TextField
             label={t('editor.connectionRoleManual')}
             value={capability.connectionRole}
@@ -805,48 +707,15 @@ function CapabilityCard({
             );
           })}
 
-          {capability.task === 'chat' ? <><Text style={[styles.subLabel, { color: colors.textSecondary }]}>
-            {t('editor.traits')}
-          </Text>
-          <View style={styles.chips}>
-            {MODEL_TRAIT_ORDER.map((trait) => {
-              const active = capability.traits.includes(trait);
-              return (
-                <Pressable
-                  key={trait}
-                  accessibilityRole="checkbox"
-                  disabled={validationPending || disabled}
-                  {...a11yState({ checked: active, disabled: validationPending || disabled })}
-                  onPress={() =>
-                    onChange({
-                      traits: sortTraits(
-                        active
-                          ? capability.traits.filter((item) => item !== trait)
-                          : [...capability.traits, trait],
-                      ),
-                    })
-                  }
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primarySoft : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? colors.primary : colors.textSecondary },
-                    ]}
-                  >
-                    {t(`trait.${trait}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          </> : null}
+          {capability.task === 'chat' ? (
+            <MultiSelect
+              label={t('editor.traits')}
+              value={capability.traits}
+              options={MODEL_TRAIT_ORDER.map((trait) => ({ value: trait, label: t(`trait.${trait}`) }))}
+              disabled={validationPending || disabled}
+              onChange={(traits) => onChange({ traits: sortTraits(traits) })}
+            />
+          ) : null}
 
           <TextField
             label={t('editor.contextLimit')}
@@ -954,19 +823,8 @@ const styles = StyleSheet.create({
   section: { gap: Spacing.sm },
   flex: { flex: 1, gap: 2 },
   label: { fontSize: FontSize.sm, fontWeight: '600' },
-  subLabel: { fontSize: FontSize.sm, fontWeight: '600', marginTop: Spacing.xs },
   sectionTitle: { fontSize: FontSize.md, fontWeight: '700' },
   hint: { fontSize: FontSize.xs, lineHeight: 17 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  chip: {
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipText: { fontSize: FontSize.sm, fontWeight: '600' },
   catalogCard: { gap: Spacing.sm },
   catalogHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
   catalogRow: {

@@ -153,8 +153,6 @@
     "title": "Add provider",
     "platform": "Platform",
     "platformHint": "Picking a preset fills in the base URL. For gateways choose New API or Custom.",
-    "showAllPlatforms": "Show all platforms",
-    "showCommonPlatforms": "Show common platforms only",
     "nameHint": "The name shown inside the app.",
     "moreModels": "{{count}} more hidden — type to filter",
     "keyRequired": "Please enter an API key",

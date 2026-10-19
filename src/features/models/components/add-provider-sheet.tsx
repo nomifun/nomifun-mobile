@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Button, TextField, toast } from '@/components/ui';
+import { Button, Select, TextField, toast } from '@/components/ui';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createProvider, fetchModelsAnonymous } from '@/features/models/api';
@@ -41,19 +41,12 @@ import type {
 } from '@/features/models/types';
 import { a11yState } from '@/utils/a11y';
 
-const QUICK_PLATFORM_PRESETS = new Set([
-  'OpenAI',
-  'Anthropic',
-  'gemini',
-  'DeepSeek',
-  'OpenRouter',
-  'Dashscope',
-  'Moonshot',
-  'StepFun',
-  'new-api',
-  'custom',
-  'AWS-Bedrock',
-]);
+const PLATFORM_OPTIONS = PLATFORM_PRESETS.map((preset, index) => ({
+  value: String(index),
+  label: preset.label,
+}));
+
+const BEDROCK_AUTH_METHODS: readonly BedrockAuthMethod[] = ['accessKey', 'profile', 'defaultChain'];
 
 /**
  * Mobile translation of the desktop AddPlatformModal.
@@ -77,7 +70,6 @@ export function AddProviderSheet({
   const { t: tc } = useTranslation('common');
 
   const [presetIndex, setPresetIndex] = useState(0);
-  const [showAllPlatforms, setShowAllPlatforms] = useState(false);
   const preset = PLATFORM_PRESETS[presetIndex] ?? PLATFORM_PRESETS[0];
   const [name, setName] = useState(preset.label);
   const [baseUrl, setBaseUrl] = useState(preset.baseUrl);
@@ -142,14 +134,6 @@ export function AddProviderSheet({
   // recommendation, the manifest response is the backend authority for the
   // runtime platform/base URL of regional presets.
   const manifests = useModelProtocolManifests(preset.preset, ['chat', ...selectedTasks], baseUrl, definition.model);
-  const platformOptions = useMemo(
-    () =>
-      PLATFORM_PRESETS.map((item, index) => ({ item, index })).filter(
-        ({ item, index }) =>
-          showAllPlatforms || QUICK_PLATFORM_PRESETS.has(item.preset) || index === presetIndex,
-      ),
-    [presetIndex, showAllPlatforms],
-  );
   const bootstrapManifest = manifests.manifests.chat;
   const firstManifest = selectedTasks
     .map((task) => manifests.manifests[task])
@@ -245,7 +229,6 @@ export function AddProviderSheet({
     setCatalogLoading(false);
     const first = PLATFORM_PRESETS[0];
     setPresetIndex(0);
-    setShowAllPlatforms(false);
     setName(first.label);
     setBaseUrl(first.baseUrl);
     setAuthScheme(first.defaultAuthScheme ?? 'bearer');
@@ -536,44 +519,15 @@ export function AddProviderSheet({
         </Button>
       }
     >
-      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('add.platform')}</Text>
-      <View style={styles.chips}>
-        {platformOptions.map(({ item, index }) => {
-          const active = index === presetIndex;
-          return (
-            <Pressable
-              key={`${item.preset}-${item.platform}`}
-              accessibilityRole="button"
-              disabled={saving}
-              {...a11yState({ selected: active, disabled: saving })}
-              onPress={() => pickPreset(index)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: active ? colors.primarySoft : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
-                  opacity: saving ? 0.5 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.chipText, { color: active ? colors.primary : colors.textSecondary }]}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Button
-        small
-        variant="ghost"
+      <Select
+        label={t('add.platform')}
+        value={String(presetIndex)}
+        options={PLATFORM_OPTIONS}
+        onChange={(value) => pickPreset(Number(value))}
         disabled={saving}
-        onPress={() => setShowAllPlatforms((current) => !current)}
-      >
-        {showAllPlatforms ? t('add.showCommonPlatforms') : t('add.showAllPlatforms')}
-      </Button>
-      <Text style={[styles.hint, { color: colors.textTertiary }]}>{t('add.platformHint')}</Text>
+        hint={t('add.platformHint')}
+        searchable
+      />
 
       <TextField
         label={t('provider.name')}
@@ -617,39 +571,16 @@ export function AddProviderSheet({
             onChangeText={setBedrockRegion}
             editable={!saving}
           />
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('provider.bedrockAuthMethod')}
-          </Text>
-          <View style={styles.chips}>
-            {(['accessKey', 'profile', 'defaultChain'] as const).map((method) => {
-              const active = method === bedrockAuthMethod;
-              return (
-                <Pressable
-                  key={method}
-                  accessibilityRole="button"
-                  disabled={saving}
-                  {...a11yState({ selected: active, disabled: saving })}
-                  onPress={() => setBedrockAuthMethod(method)}
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primarySoft : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? colors.primary : colors.textSecondary },
-                    ]}
-                  >
-                    {t(`provider.bedrockAuth.${method}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Select
+            label={t('provider.bedrockAuthMethod')}
+            value={bedrockAuthMethod}
+            options={BEDROCK_AUTH_METHODS.map((method) => ({
+              value: method,
+              label: t(`provider.bedrockAuth.${method}`),
+            }))}
+            onChange={setBedrockAuthMethod}
+            disabled={saving}
+          />
           {bedrockAuthMethod === 'profile' ? (
             <TextField
               label={t('provider.bedrockProfile')}
@@ -783,43 +714,23 @@ export function AddProviderSheet({
             }
             keyboardType="url"
           />
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('connections.authScheme')}
-          </Text>
-          <View style={styles.chips}>
-            {AUTH_SCHEME_PRESETS.map((option) => {
-              const active = connectionEditor.authScheme === option;
-              return (
-                <Pressable
-                  key={option}
-                  accessibilityRole="button"
-                  disabled={connectionSaving}
-                  {...a11yState({ selected: active, disabled: connectionSaving })}
-                  onPress={() =>
-                    setConnectionEditor((current) =>
-                      current ? { ...current, authScheme: option } : current,
-                    )
-                  }
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primarySoft : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: active ? colors.primary : colors.textSecondary },
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Select
+            label={t('connections.authScheme')}
+            value={connectionEditor.authScheme}
+            options={[
+              ...AUTH_SCHEME_PRESETS.map((option) => ({ value: option, label: option })),
+              ...(!(AUTH_SCHEME_PRESETS as readonly string[]).includes(connectionEditor.authScheme)
+                ? [{
+                    value: connectionEditor.authScheme,
+                    label: connectionEditor.authScheme || t('connections.authSchemeCustom'),
+                  }]
+                : []),
+            ]}
+            onChange={(authScheme) =>
+              setConnectionEditor((current) => (current ? { ...current, authScheme } : current))
+            }
+            disabled={connectionSaving}
+          />
           <TextField
             label={t('connections.authSchemeCustom')}
             value={connectionEditor.authScheme}
@@ -930,16 +841,6 @@ const styles = StyleSheet.create({
   hint: { fontSize: FontSize.xs, lineHeight: 17 },
   link: { fontSize: FontSize.sm, fontWeight: '600', paddingVertical: Spacing.xs },
   error: { fontSize: FontSize.sm, lineHeight: 19, marginTop: Spacing.xs },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  chip: {
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipText: { fontSize: FontSize.sm, fontWeight: '600' },
   connectionEditor: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
