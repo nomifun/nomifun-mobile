@@ -30,7 +30,7 @@ export function CompanionCard({
       name={companion.name}
       subtitle={snippet}
       onPress={onPress}
-      figure={<CompanionFigure companion={companion} size={92} mood={status?.mood} />}
+      figure={<CompanionFigure companion={companion} size={48} mood={status?.mood} />}
       badge={isDefault ? <Tag tone="primary">{t('roster.default')}</Tag> : undefined}
       metadata={
         <>

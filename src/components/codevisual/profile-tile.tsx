@@ -6,7 +6,7 @@ import { FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Interactive } from '@/components/ui/interactive';
 
-/** ProfileCard port with real character imagery, centered identity and status metadata. */
+/** Compact profile card with a horizontal identity row and wrapping status metadata. */
 export function ProfileTile({
   name,
   subtitle,
@@ -36,41 +36,41 @@ export function ProfileTile({
         },
       ]}
     >
-      <View style={styles.top}>
-        {badge}
-        <View style={styles.spacer} />
+      <View style={styles.header}>
+        <View style={styles.figure}>{figure}</View>
+        <View style={styles.identity}>
+          <View style={styles.titleRow}>
+            <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
+              {name}
+            </Text>
+            {badge}
+          </View>
+          <Text numberOfLines={2} style={[styles.subtitle, { color: colors.textTertiary }]}>
+            {subtitle}
+          </Text>
+        </View>
         <Ionicons name="arrow-forward-outline" size={16} color={colors.textTertiary} />
       </View>
-      <View style={styles.figure}>{figure}</View>
-      <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
-        {name}
-      </Text>
-      <Text numberOfLines={2} style={[styles.subtitle, { color: colors.textTertiary }]}>
-        {subtitle}
-      </Text>
       <View style={[styles.metadata, { borderTopColor: colors.borderLight }]}>{metadata}</View>
     </Interactive>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: { borderWidth: 1, borderRadius: Radius.md, padding: Spacing.md, minHeight: 248 },
-  top: { height: 24, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  spacer: { flex: 1 },
-  figure: { height: 104, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: FontSize.md, lineHeight: 22, fontWeight: '600', textAlign: 'center' },
+  tile: { borderWidth: 1, borderRadius: Radius.md, padding: Spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  figure: { flexShrink: 0 },
+  identity: { flex: 1, minWidth: 0, gap: Spacing.xs },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  name: { flexShrink: 1, fontSize: FontSize.md, lineHeight: 22, fontWeight: '600' },
   subtitle: {
     fontSize: FontSize.xs,
     lineHeight: 18,
-    minHeight: 36,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
   },
   metadata: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: Spacing.xs,
     borderTopWidth: 1,
     paddingTop: Spacing.sm,

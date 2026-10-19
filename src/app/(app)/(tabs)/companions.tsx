@@ -40,7 +40,8 @@ export default function CompanionsScreen() {
       MaxContentWidth,
     ) -
     Spacing.lg * 2;
-  const columns = contentWidth >= 700 ? 3 : contentWidth >= 320 ? 2 : 1;
+  // Keep the identity and status badges readable instead of squeezing phone cards into a grid.
+  const columns = contentWidth >= 640 ? 2 : 1;
   const tileWidth = (contentWidth - (columns - 1) * Spacing.md) / columns;
 
   const openDetail = (companionId: string) => pushPath(`/companion/${companionId}`);
