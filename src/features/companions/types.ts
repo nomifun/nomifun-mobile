@@ -1,11 +1,11 @@
 /**
- * Wire shapes for `/api/companion/*` (snake_case, 1:1 with the Rust JSON).
+ * Wire fields consumed by Mobile from `/api/companion/*` (snake_case).
  *
- * Mirrors `ui/src/common/adapter/ipcBridge.ts` in the desktop repo — see
- * docs/research/feature-companions.md §3. Retired fields (`scope_kind`,
+ * Mirrors `ui/src/common/adapter/ipcBridge.ts` in the desktop repo. Retired fields (`scope_kind`,
  * `scope_companion_id`, `provenance`, `superseded_by`) are gone from the wire;
  * never reintroduce them.
  */
+import type { ModelRef, TextToSpeechConfig } from '@/features/models/types';
 
 export type CompanionMood = 'happy' | 'content' | 'sleepy' | 'worried' | 'excited';
 export type MemoryKind =
@@ -21,18 +21,6 @@ export type SkillStatus = 'draft' | 'active' | 'archived';
 export type RobotPhase = 'offline' | 'idle' | 'listening' | 'speaking';
 /** Built-in characters implemented in the desktop app (+ DIY `custom`). */
 export type CharacterId = 'mochi' | 'ink' | 'bolt' | 'custom';
-
-export interface ModelRef {
-  provider_id: string;
-  model: string;
-  use_model?: string | null;
-}
-
-export interface TtsSelection {
-  provider_id: string;
-  model: string;
-  voice: string | null;
-}
 
 export interface CustomFigureMeta {
   aspect: number;
@@ -66,7 +54,7 @@ export interface CompanionProfile {
   vision_model: ModelRef | null;
   voice: {
     asr: ModelRef | null;
-    tts: TtsSelection | null;
+    tts: TextToSpeechConfig | null;
     vad: { engine: string; sensitivity: number; min_silence_ms: number };
   };
   learn: { enabled: boolean; interval_minutes: number; model: ModelRef | null };
@@ -100,7 +88,16 @@ export type CompanionWithStatus = CompanionProfile & { status: CompanionStatus }
 export interface CompanionProfilePatch {
   name?: string;
   persona?: { preset?: string; custom?: string };
-  learn?: { enabled?: boolean; interval_minutes?: number };
+  model?: ModelRef | null;
+  fallback_model?: ModelRef | null;
+  vision_model?: ModelRef | null;
+  voice?: {
+    asr?: ModelRef | null;
+    /** Omit `voice` to retain it; `null` uses the provider's default voice. */
+    tts?: (ModelRef & { voice?: string | null }) | null;
+  };
+  learn?: { enabled?: boolean; interval_minutes?: number; model?: ModelRef | null };
+  evolve?: { model?: ModelRef | null };
   appearance?: {
     companion_enabled?: boolean;
     quiet_start?: string;

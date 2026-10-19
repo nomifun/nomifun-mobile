@@ -197,11 +197,3 @@ export function plainSnippet(snippet: string | null | undefined): string {
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export const isValidClockTime = (value: string) => TIME_RE.test(value.trim());
-
-/** Model reference → "provider · model", or null when unset. */
-export function modelLabel(
-  ref: { provider_id: string; model: string } | null | undefined,
-): string | null {
-  if (!ref?.model) return null;
-  return ref.provider_id ? `${ref.provider_id} · ${ref.model}` : ref.model;
-}

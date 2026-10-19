@@ -26,7 +26,7 @@
     "unknownProvider": "Unknown provider",
     "unavailableTag": "unavailable",
     "staleWarning": "The saved model is currently unavailable (provider or model disabled or deleted). Pick another one.",
-    "noCandidates": "No model can handle chat",
+    "noCandidates": "No matching models",
     "noCandidatesHint": "Enable a provider first and make sure it has at least one enabled model.",
     "catalogUnresolved": "The catalog could not be read; your current setting is kept.",
     "clear": "Clear default model",

@@ -9,7 +9,7 @@
     "default": "默认",
     "create": "新建伙伴",
     "emptyTitle": "还没有桌面伙伴",
-    "emptyHint": "先创建一个伙伴，给它名字和形象；模型、知识库和自定义形象仍需在桌面端配置。",
+    "emptyHint": "在手机上创建伙伴并选择模型，即可开始聊天；知识库与自定义形象可在桌面端设置。",
     "loadFailed": "读取伙伴列表失败",
     "wsReconnecting": "正在重连桌面端",
     "wsOffline": "实时连接已断开"
@@ -71,8 +71,8 @@
     "deskShown": "桌面已显示",
     "deskHidden": "桌面已隐藏",
     "learning": "学习中…",
-    "chatModelMissingTitle": "还没有配置聊天模型",
-    "chatModelMissingBody": "请在桌面端「桌面伙伴 → 总览 → 模型配置」里为它选一个聊天模型，之后就能在手机上和它聊天。",
+    "chatModelMissingTitle": "尚未设置默认聊天模型",
+    "chatModelMissingBody": "在下方「模型」区域选择主对话模型。已有会话可以继续打开，并在聊天页切换模型。",
     "statsTitle": "成长数据",
     "statMemories": "有效记忆",
     "statArchived": "已归档",
@@ -90,11 +90,6 @@
     "weeklySkills": "新技能 {{count}}",
     "weeklyMemories": "新记忆 {{count}}",
     "modelsTitle": "模型",
-    "modelsHint": "模型配置请在桌面端完成。",
-    "modelMain": "主对话",
-    "modelFallback": "备用",
-    "modelVision": "视觉",
-    "modelTts": "语音合成",
     "modelUnset": "未配置",
     "skillsTitle": "技能",
     "skillsEmpty": "还没有技能",
@@ -125,7 +120,10 @@
     "skillRejectBody": "拒绝后草稿会被归档、不再启用，伙伴也不会再从同一规律里重复提出它。此操作不可撤销，但你随后仍可在桌面端手动创建技能。",
     "skillRejectReasonLabel": "拒绝原因（可选）",
     "skillRejectReasonHint": "写下原因能帮伙伴以后少提类似的技能。",
-    "skillRejectConfirm": "确认拒绝"
+    "skillRejectConfirm": "确认拒绝",
+    "chatFailed": "无法打开聊天，请重试",
+    "learnModelMissing": "请先在「模型」中设置学习模型。",
+    "learnNoEvents": "暂无可供学习的新事件"
   },
   "memory": {
     "searchPlaceholder": "搜索记忆…",
@@ -185,7 +183,7 @@
     "learnEnabled": "定时学习",
     "learnEnabledHint": "每 {{minutes}} 分钟回顾一次最近的事件，沉淀成记忆与技能",
     "desktopOnlyTitle": "需要在桌面端完成",
-    "desktopOnlyBody": "形象与形象库、模型与语音配置、知识库绑定、技能草稿审阅，以及迁移导入导出，仍然只在桌面端提供。",
+    "desktopOnlyBody": "形象与形象库、知识库绑定、迁移导入导出仍需在桌面端完成。",
     "dangerTitle": "危险操作",
     "deleteHint": "永久删除「{{name}}」，连同它的记忆、技能、成长进度与聊天记录。",
     "delete": "删除伙伴",
@@ -202,11 +200,41 @@
     "submit": "创建",
     "created": "{{name}} 来啦！",
     "failed": "创建失败",
-    "hint": "名字和形象先定下来；模型、记忆和知识库可以之后在桌面端补齐。自定义形象需要在桌面端制作。"
+    "hint": "创建后可在手机上配置模型、添加记忆并开始聊天。知识库与自定义形象在桌面端设置。"
   },
   "detail": {
     "loadFailed": "读取伙伴失败",
     "notFound": "找不到这个伙伴",
-    "notFoundHint": "它可能已经被删除了，返回列表看看吧。"
+    "notFoundHint": "它可能已经被删除了，返回列表看看吧。",
+    "refreshFailed": "数据刷新失败，暂时显示最近确认的配置。"
+  },
+  "modelSettings": {
+    "slots": {
+      "model": "主对话",
+      "fallback_model": "备用",
+      "vision_model": "视觉",
+      "asr": "语音识别",
+      "tts": "语音合成",
+      "learn": "学习模型",
+      "evolve": "进化模型"
+    },
+    "hints": {
+      "model": "设置伙伴的默认聊天模型，用于后续新建会话。已有会话可在聊天页切换模型。",
+      "fallback_model": "为伙伴单独指定备用对话模型，清除后不再单独指定。",
+      "vision_model": "用于伙伴的独立看图能力。未单独指定时，按主对话模型的图片输入能力使用。",
+      "asr": "为伙伴单独指定语音识别模型；清除后跟随全局语音识别设置。",
+      "tts": "为伙伴单独指定语音合成模型和音色；清除后跟随全局语音合成设置。",
+      "learn": "用于伙伴学习任务，与主对话模型分别设置。",
+      "evolve": "用于伙伴技能进化任务，与主对话模型分别设置。"
+    },
+    "defaultHint": "这里设置伙伴的默认模型。已有会话的模型可在聊天页单独切换。",
+    "configure": "配置{{model}}",
+    "manageModels": "管理模型",
+    "followGlobal": "跟随全局设置",
+    "followMain": "跟随主模型能力",
+    "clear": "清除配置",
+    "voice": "音色：{{voice}}",
+    "defaultVoice": "供应商默认",
+    "unavailable": "不可用"
   }
 }

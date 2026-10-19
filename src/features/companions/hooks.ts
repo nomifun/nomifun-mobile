@@ -7,9 +7,12 @@
  * same render (the desktop's `useNomi.ts:43-51` freshness gate).
  */
 import { useCallback, useMemo, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 import { useWsTopic } from '@/hooks/use-ws';
+import { useConnection } from '@/hooks/use-connection';
+import { connectionStore } from '@/api/connection';
+import { StaleConnectionError } from '@/api/types';
 
 import {
   ROBOTS_KEY,
@@ -19,6 +22,7 @@ import {
   companionKey,
   decideCompanionSkill,
   memoriesKey,
+  patchCompanion,
   skillsKey,
   weeklyDigestKey,
   type MemoryQuery,
@@ -26,6 +30,7 @@ import {
 import { applySkillDecision } from './skills';
 import type {
   CompanionMemoryPage,
+  CompanionProfilePatch,
   CompanionSharedConfig,
   CompanionSkillPage,
   CompanionWeeklyDigest,
@@ -113,6 +118,7 @@ export function useCompanionDetail(companionId: string) {
   const key = companionId ? companionKey(companionId) : null;
   const { data, error, isLoading, mutate } = useSWR<CompanionWithStatus>(key);
   const [learning, setLearning] = useState(false);
+  const { saveProfile, profileSaving } = useCompanionProfileMutation(companionId);
 
   // Freshness gate: never hand out another companion's profile mid-switch.
   const companion = data && data.companion_id === companionId ? data : undefined;
@@ -157,7 +163,47 @@ export function useCompanionDetail(companionId: string) {
     refreshing,
     refresh,
     mutate,
+    saveProfile,
+    profileSaving,
   };
+}
+
+/** One write path for all profile controls, scoped to the original Desktop. */
+function useCompanionProfileMutation(companionId: string) {
+  const { epoch } = useConnection();
+  const { mutate } = useSWRConfig();
+  const scope = `${epoch}:${companionId}`;
+  const owner = useMemo(() => ({ tail: Promise.resolve(), pending: 0 }), [scope]);
+  const [writing, setWriting] = useState({ scope, count: 0 });
+
+  const saveProfile = useCallback((patch: CompanionProfilePatch): Promise<void> => {
+    const assertCurrent = () => {
+      if (connectionStore.epoch() !== epoch) throw new StaleConnectionError();
+    };
+    owner.pending += 1;
+    setWriting({ scope, count: owner.pending });
+    const operation = owner.tail.then(async () => {
+      assertCurrent();
+      const profile = await patchCompanion(companionId, patch, { expectedEpoch: epoch });
+      assertCurrent();
+      // PATCH returns the committed profile without status. Preserve the status
+      // snapshot until GET refreshes it; never replace the detail with a raw PATCH DTO.
+      await mutate<CompanionWithStatus>(companionKey(companionId), (current) => {
+        assertCurrent();
+        return current?.companion_id === companionId ? { ...current, ...profile } : current;
+      }, { revalidate: false });
+      assertCurrent();
+      await Promise.all([mutate(companionKey(companionId)), mutate(ROSTER_KEY)]);
+      assertCurrent();
+    });
+    owner.tail = operation.catch(() => {});
+    return operation.finally(() => {
+      owner.pending -= 1;
+      setWriting((current) => current.scope === scope ? { scope, count: owner.pending } : current);
+    });
+  }, [companionId, epoch, mutate, owner, scope]);
+
+  return { saveProfile, profileSaving: writing.scope === scope && writing.count > 0 };
 }
 
 /** Overview extras: weekly digest, skills and the robots bound to this companion. */

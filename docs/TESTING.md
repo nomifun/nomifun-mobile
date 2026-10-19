@@ -11,6 +11,30 @@ Three gates, in the order of how often you should run them:
 | `bun run e2e:project` | **yes** | the whole project-session flow works |
 | `node --test scripts/voice-web-server.test.mjs` | isolated fixtures | Node static/API/WS boundaries and owned shutdown; no cloud/device proof |
 | `node e2e/voice-web.mjs` (`e2e:voice-web`) | **fresh isolated API-only host** | source-bound RN Web UI plus browser synthetic-media contracts; see the dedicated procedure below |
+| `node e2e/companion-models.mjs` | isolated HTTP/WS fixture | production RN Web companion model selection, save, clear, voice editing and error recovery; no Desktop or model calls |
+
+## Companion model settings
+
+```sh
+bun test src/features/companions/model-settings.test.ts src/features/models/selectors.test.ts tests/cs-normalize.test.ts
+bun run typecheck
+bun run check:i18n
+CI=1 EXPO_OFFLINE=1 bunx expo export -p web --output-dir .tmp-e2e/companion-models/web
+node e2e/companion-models.mjs
+```
+
+The browser script uses the Playwright loader in `e2e/lib.mjs`; set
+`NOMI_E2E_PLAYWRIGHT` to an existing installation if needed, and optionally
+`NOMI_E2E_EXECUTABLE_PATH` to an existing Chromium executable. It serves only
+loopback, blocks external network requests and rejects unexpected API calls.
+The seven model slots use the real exported Mobile components and HTTP transport.
+Checks cover exact target-only PATCH bodies, authoritative re-reads, reload/tab
+echo, enabled/task filtering, TTS voice preservation/editing/clear, inline failures,
+retry and pending-write controls, and empty versus unreadable model catalogs.
+Existing Session data must remain unchanged. Reports and screenshots are written
+under `.tmp-e2e/companion-models` (override with `--export-dir`/`--report-dir`).
+This fixture proves Mobile interaction and serialization; it does not establish
+real Desktop acceptance, upstream inference, or Android/iOS device behavior.
 
 ## Session data and Android module identity
 

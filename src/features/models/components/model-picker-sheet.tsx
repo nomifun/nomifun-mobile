@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Sheet } from '@/components/ui/sheet';
 import { useTaskModels } from '@/features/models/hooks';
 import { isManagedProvider } from '@/features/models/platforms';
-import { modelSupportsTask, orderSelectorProviders } from '@/features/models/selectors';
+import { usableModelRefs } from '@/features/models/selectors';
 import type { ModelRef, ModelTask, ModelTrait, ProviderResponse } from '@/features/models/types';
 import { a11yState } from '@/utils/a11y';
 import { modelRefLabel } from '../presentation';
@@ -21,7 +21,8 @@ interface ModelPickerSheetProps {
   requiredTraits?: readonly ModelTrait[];
   title: string;
   current?: ModelRef;
-  providers: readonly ProviderResponse[];
+  /** Undefined is unresolved; an empty array is an authoritative empty catalog. */
+  providers: readonly ProviderResponse[] | undefined;
   busy?: boolean;
   onClose: () => void;
   onSelect: (ref: ModelRef) => void;
@@ -29,6 +30,8 @@ interface ModelPickerSheetProps {
   children?: ReactNode;
   footer?: ReactNode;
   showClear?: boolean;
+  clearLabel?: string;
+  emptyAction?: ReactNode;
 }
 
 /**
@@ -56,28 +59,26 @@ export function ModelPickerSheet({
   children,
   footer,
   showClear = true,
+  clearLabel,
+  emptyAction,
 }: ModelPickerSheetProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
   const { t: tc } = useTranslation('common');
-  const { candidates, unresolved, isLoading, refresh } = useTaskModels(
+  const { candidates, error, isLoading, refresh } = useTaskModels(
     task,
     visible,
     requiredTraits,
   );
-  const localCandidates = orderSelectorProviders(providers).flatMap((provider) => {
-    if (provider.enabled === false) return [];
-    return provider.models
-      .filter((model) => model.enabled === true && modelSupportsTask(model, task, requiredTraits))
-      .map((model) => ({ provider_id: provider.provider_id, model: model.model }));
-  });
   // The management page already owns a complete provider graph. Prefer that
   // snapshot so an optimistic enable/disable immediately updates this sheet,
   // while the SWR hook still supplies authoritative loading/error semantics.
-  const displayedCandidates = providers.length > 0 ? localCandidates : candidates;
+  const displayedCandidates = providers === undefined
+    ? candidates
+    : usableModelRefs(providers, task, requiredTraits);
 
   const providerLabel = (providerId: string): string => {
-    const provider = providers.find((p) => p.provider_id === providerId);
+    const provider = providers?.find((p) => p.provider_id === providerId);
     if (!provider) return providerId;
     if (isManagedProvider(provider.platform)) return t('list.managedName');
     return provider.name || provider.platform;
@@ -102,7 +103,7 @@ export function ModelPickerSheet({
       {children}
       {isLoading && !displayedCandidates ? <Loading label={tc('state.loading')} /> : null}
 
-      {unresolved ? (
+      {error ? (
         <ErrorState
           message={t('defaults.catalogUnresolved')}
           onRetry={refresh}
@@ -129,12 +130,15 @@ export function ModelPickerSheet({
         </View>
       ) : null}
 
-      {displayedCandidates && displayedCandidates.length === 0 ? (
-        <EmptyState
-          icon="cube-outline"
-          title={t('defaults.noCandidates')}
-          description={t('defaults.noCandidatesHint')}
-        />
+      {displayedCandidates && displayedCandidates.length === 0 && !error ? (
+        <>
+          <EmptyState
+            icon="cube-outline"
+            title={t('defaults.noCandidates')}
+            description={t('defaults.noCandidatesHint')}
+          />
+          {emptyAction}
+        </>
       ) : null}
 
       {[...groups.entries()].map(([providerId, models]) => (
@@ -184,7 +188,7 @@ export function ModelPickerSheet({
           style={({ pressed }) => [styles.clear, { opacity: busy ? 0.5 : pressed ? 0.6 : 1 }]}
         >
           <Ionicons name="trash-outline" size={16} color={colors.danger} />
-          <Text style={[styles.clearText, { color: colors.danger }]}>{t('defaults.clear')}</Text>
+          <Text style={[styles.clearText, { color: colors.danger }]}>{clearLabel ?? t('defaults.clear')}</Text>
         </Pressable>
       ) : null}
     </Sheet>

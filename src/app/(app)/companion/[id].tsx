@@ -1,14 +1,14 @@
 /**
  * One companion: 总览 / 记忆 / 设置. The desktop workspace has seven tabs; the
  * phone keeps the three that read well on a small screen and points at the
- * desktop for the rest (figure library, models, knowledge bases, migration).
+ * desktop for the rest (figure library, knowledge bases, migration).
  */
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState, ErrorState, Loading, Screen } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Loading, Notice, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { MemoryTab } from '@/features/companions/components/memory-tab';
 import { OverviewTab } from '@/features/companions/components/overview-tab';
@@ -82,12 +82,22 @@ export default function CompanionDetailScreen() {
       </View>
 
       <View style={styles.body}>
+        {detail.error ? (
+          <View style={styles.refreshError}>
+            <Notice tone="warning">{t('detail.refreshFailed')}</Notice>
+            <Button small variant="secondary" loading={detail.refreshing} onPress={detail.refresh}>
+              {tc('actions.retry')}
+            </Button>
+          </View>
+        ) : null}
         {tab === 'overview' ? (
           <OverviewTab
             companion={companion}
             learning={detail.learning}
             setLearning={detail.setLearning}
             refreshProfile={() => detail.mutate()}
+            saveProfile={detail.saveProfile}
+            profileSaving={detail.profileSaving}
           />
         ) : null}
         {tab === 'memory' ? <MemoryTab companionId={companionId} /> : null}
@@ -95,6 +105,8 @@ export default function CompanionDetailScreen() {
           <SettingsTab
             companion={companion}
             refreshProfile={() => detail.mutate()}
+            saveProfile={detail.saveProfile}
+            profileSaving={detail.profileSaving}
             refreshing={detail.refreshing}
             onRefresh={detail.refresh}
             onDeleted={() => router.back()}
@@ -108,4 +120,5 @@ export default function CompanionDetailScreen() {
 const styles = StyleSheet.create({
   tabBar: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
   body: { flex: 1 },
+  refreshError: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.xs },
 });

@@ -15,15 +15,18 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-import { ROSTER_KEY, deleteCompanion, patchCompanion } from '../api';
+import { ROSTER_KEY, deleteCompanion } from '../api';
 import type { CompanionProfilePatch, CompanionWithStatus } from '../types';
 import { PERSONA_PRESETS, confirmDestructive, isValidClockTime } from '../utils';
 import { DesktopHint } from './rows';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ModelsCard } from './models-card';
 
 interface SettingsTabProps {
   companion: CompanionWithStatus;
   refreshProfile: () => Promise<unknown>;
+  saveProfile: (patch: CompanionProfilePatch) => Promise<void>;
+  profileSaving: boolean;
   refreshing: boolean;
   onRefresh: () => void;
   onDeleted: () => void;
@@ -32,6 +35,8 @@ interface SettingsTabProps {
 export function SettingsTab({
   companion,
   refreshProfile,
+  saveProfile,
+  profileSaving,
   refreshing,
   onRefresh,
   onDeleted,
@@ -79,7 +84,7 @@ export function SettingsTab({
     quietStart !== (companion.appearance?.quiet_start ?? '') ||
     quietEnd !== (companion.appearance?.quiet_end ?? '');
   // An emptied name commits nothing (desktop AppearanceSection.tsx:88-94).
-  const canSave = dirty && !!trimmedName && quietValid && !saving;
+  const canSave = dirty && !!trimmedName && quietValid && !saving && !profileSaving;
 
   const save = () => {
     if (!canSave) return;
@@ -97,8 +102,7 @@ export function SettingsTab({
     setSaving(true);
     void (async () => {
       try {
-        await patchCompanion(companionId, patch);
-        await Promise.all([refreshProfile(), globalMutate(ROSTER_KEY)]);
+        await saveProfile(patch);
         toast.success(tc('feedback.saved'));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : tc('feedback.requestFailed'));
@@ -112,8 +116,7 @@ export function SettingsTab({
   const applyToggle = (patch: CompanionProfilePatch, clear: (value: boolean | null) => void) => {
     void (async () => {
       try {
-        await patchCompanion(companionId, patch);
-        await Promise.all([refreshProfile(), globalMutate(ROSTER_KEY)]);
+        await saveProfile(patch);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : tc('feedback.requestFailed'));
         await refreshProfile();
@@ -232,12 +235,15 @@ export function SettingsTab({
         </Button>
       </Card>
 
+      <ModelsCard key={companionId} companion={companion} saveProfile={saveProfile} saving={profileSaving} />
+
       <SectionTitle>{t('settings.togglesTitle')}</SectionTitle>
       <Card style={styles.card}>
         <ToggleRow
           title={t('settings.deskVisible')}
           hint={t('settings.deskVisibleHint')}
           value={deskEnabled}
+          disabled={profileSaving || pendingDesk !== null}
           onValueChange={(next) => {
             setPendingDesk(next);
             applyToggle({ appearance: { companion_enabled: next } }, setPendingDesk);
@@ -249,6 +255,7 @@ export function SettingsTab({
             minutes: companion.learn?.interval_minutes ?? 60,
           })}
           value={learnEnabled}
+          disabled={profileSaving || pendingLearn !== null}
           onValueChange={(next) => {
             setPendingLearn(next);
             applyToggle({ learn: { enabled: next } }, setPendingLearn);
@@ -278,11 +285,13 @@ function ToggleRow({
   title,
   hint,
   value,
+  disabled,
   onValueChange,
 }: {
   title: string;
   hint: string;
   value: boolean;
+  disabled?: boolean;
   onValueChange: (next: boolean) => void;
 }) {
   const { colors } = useTheme();
@@ -292,7 +301,7 @@ function ToggleRow({
         <Text style={[styles.toggleTitle, { color: colors.text }]}>{title}</Text>
         <Text style={[styles.hint, { color: colors.textTertiary }]}>{hint}</Text>
       </View>
-      <Toggle accessibilityLabel={title} value={value} onValueChange={onValueChange} />
+      <Toggle accessibilityLabel={title} value={value} disabled={disabled} onValueChange={onValueChange} />
     </View>
   );
 }

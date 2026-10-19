@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Toggle } from '@/components/ui/toggle';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ import type {
 
 interface ModelPickerBaseProps {
   visible: boolean;
-  providers: readonly ProviderResponse[];
+  providers: readonly ProviderResponse[] | undefined;
   busy?: boolean;
   onClose: () => void;
 }
@@ -174,10 +174,18 @@ export function TextToSpeechDefaultModelSheet({
   onClose,
   onSave,
   error,
+  title,
+  clearLabel,
+  emptyAction,
+  hint,
 }: ModelPickerBaseProps & {
   config?: TextToSpeechConfig;
   onSave: (value: TextToSpeechConfig | null) => Promise<void>;
   error?: string;
+  title?: string;
+  clearLabel?: string;
+  emptyAction?: ReactNode;
+  hint?: ReactNode;
 }) {
   const { colors } = useTheme();
   const { t } = useTranslation('models');
@@ -185,9 +193,16 @@ export function TextToSpeechDefaultModelSheet({
   const [draftRef, setDraftRef] = useState<ModelRef | undefined>();
   const [voice, setVoice] = useState('');
   const [clearRequested, setClearRequested] = useState(false);
+  const draftDirty = useRef(false);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      draftDirty.current = false;
+      return;
+    }
+    // Accept late initial data and external updates until the user edits. Later
+    // revalidation must keep their unsaved model/voice draft intact.
+    if (draftDirty.current) return;
     setDraftRef(
       config?.provider_id && config.model
         ? { provider_id: config.provider_id, model: config.model }
@@ -200,7 +215,7 @@ export function TextToSpeechDefaultModelSheet({
   const selectedProtocol = useMemo(() => {
     if (!draftRef) return undefined;
     return providers
-      .find((provider) => provider.provider_id === draftRef.provider_id)
+      ?.find((provider) => provider.provider_id === draftRef.provider_id)
       ?.models.find((model) => model.model === draftRef.model)
       ?.capabilities.find((capability) => capability.task === 'speech_synthesis')?.protocol;
   }, [draftRef, providers]);
@@ -222,24 +237,28 @@ export function TextToSpeechDefaultModelSheet({
     <ModelPickerSheet
       visible={visible}
       task="speech_synthesis"
-      title={t('defaults.tts')}
+      title={title ?? t('defaults.tts')}
+      clearLabel={clearLabel}
+      emptyAction={emptyAction}
       current={draftRef}
       providers={providers}
       busy={busy}
       onClose={onClose}
       onSelect={(value) => {
+        draftDirty.current = true;
         setDraftRef(value);
         setClearRequested(false);
         if (draftRef?.provider_id !== value.provider_id) setVoice('');
         else {
           const nextProtocol = providers
-            .find((provider) => provider.provider_id === value.provider_id)
+            ?.find((provider) => provider.provider_id === value.provider_id)
             ?.models.find((model) => model.model === value.model)
             ?.capabilities.find((capability) => capability.task === 'speech_synthesis')?.protocol;
           if (nextProtocol === 'deepgram.speak_rest') setVoice('');
         }
       }}
       onClear={() => {
+        draftDirty.current = true;
         setDraftRef(undefined);
         setClearRequested(true);
         setVoice('');
@@ -255,12 +274,16 @@ export function TextToSpeechDefaultModelSheet({
         </View>
       }
     >
+      {hint}
       {!modelIdIsVoice ? (
         <TextField
           label={t('defaults.voice')}
           value={voice}
           editable={!busy}
-          onChangeText={setVoice}
+          onChangeText={(value) => {
+            draftDirty.current = true;
+            setVoice(value);
+          }}
           placeholder={t('defaults.voicePlaceholder')}
           hint={t('defaults.voiceHint')}
         />

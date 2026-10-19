@@ -15,6 +15,7 @@ import useSWR, { useSWRConfig, type SWRConfiguration } from 'swr';
 
 import { useProviders as useModelProviders } from '@/features/models/hooks';
 import { modelRefLabel } from '@/features/models/presentation';
+import { usableModelRefs } from '@/features/models/selectors';
 
 import * as csApi from './api';
 import { buildTaskModelGroups, mergeAgent, selectCsChannelBots } from './normalize';
@@ -39,8 +40,6 @@ export const csKeys = {
   botOwners: 'cs:bot-owners',
   channelPlugins: 'cs:channel-plugins',
   knowledgeBases: 'cs:knowledge-bases',
-  providers: 'cs:providers',
-  chatModels: 'cs:chat-models',
 } as const;
 
 /** Catalog-ish data: stable after load, refreshed by explicit refresh calls. */
@@ -236,19 +235,7 @@ export function useChatModels(): ChatModelsResult {
 
   const groups = useMemo(
     () => buildTaskModelGroups(
-      providers.flatMap((provider) =>
-        (provider.models ?? [])
-          .filter(
-            (model) =>
-              provider.enabled === true &&
-              model.enabled === true &&
-              model.capabilities.some((capability) => capability.task === 'chat'),
-          )
-          .map((model) => ({
-            provider_id: provider.provider_id,
-            model: model.model,
-          })),
-      ),
+      usableModelRefs(providers, 'chat'),
       providers,
     ),
     [providers],

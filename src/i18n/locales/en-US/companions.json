@@ -9,7 +9,7 @@
     "default": "Default",
     "create": "New companion",
     "emptyTitle": "No companions yet",
-    "emptyHint": "Create one here with a name and a character; models, knowledge bases and custom figures are still set up on the desktop.",
+    "emptyHint": "Create a companion and choose its models here to start chatting. Set up knowledge bases and custom figures on the desktop.",
     "loadFailed": "Failed to load the companion roster",
     "wsReconnecting": "Reconnecting to the desktop",
     "wsOffline": "Live connection lost"
@@ -71,8 +71,8 @@
     "deskShown": "Shown on desktop",
     "deskHidden": "Hidden on desktop",
     "learning": "Learning…",
-    "chatModelMissingTitle": "No chat model configured",
-    "chatModelMissingBody": "Pick a chat model on the desktop under Desktop Companion → Overview → Model configuration, then you can chat from your phone.",
+    "chatModelMissingTitle": "No default chat model selected",
+    "chatModelMissingBody": "Choose a main chat model under Models below. Existing sessions can still be opened; change their model from the chat page.",
     "statsTitle": "Growth",
     "statMemories": "Active memories",
     "statArchived": "Archived",
@@ -90,11 +90,6 @@
     "weeklySkills": "{{count}} new skills",
     "weeklyMemories": "{{count}} new memories",
     "modelsTitle": "Models",
-    "modelsHint": "Model configuration is done on the desktop.",
-    "modelMain": "Main chat",
-    "modelFallback": "Fallback",
-    "modelVision": "Vision",
-    "modelTts": "Text to speech",
     "modelUnset": "Not set",
     "skillsTitle": "Skills",
     "skillsEmpty": "No skills yet",
@@ -125,7 +120,10 @@
     "skillRejectBody": "The draft is archived and never activated, and the companion stops proposing it from the same pattern again. This cannot be undone, but you can still create the skill by hand on the desktop.",
     "skillRejectReasonLabel": "Reason (optional)",
     "skillRejectReasonHint": "A reason helps the companion propose fewer skills like this one.",
-    "skillRejectConfirm": "Reject draft"
+    "skillRejectConfirm": "Reject draft",
+    "chatFailed": "Could not open chat. Please try again.",
+    "learnModelMissing": "Choose a learning model under Models first.",
+    "learnNoEvents": "No new events to learn from"
   },
   "memory": {
     "searchPlaceholder": "Search memories…",
@@ -185,7 +183,7 @@
     "learnEnabled": "Scheduled learning",
     "learnEnabledHint": "Reviews recent events every {{minutes}} minutes and distils memories and skills",
     "desktopOnlyTitle": "Do this on the desktop",
-    "desktopOnlyBody": "Figures and the figure library, model and voice configuration, knowledge-base bindings, skill draft review, and migration import/export are still desktop-only.",
+    "desktopOnlyBody": "Figures and the figure library, knowledge-base bindings, and migration import/export are configured on the desktop.",
     "dangerTitle": "Danger zone",
     "deleteHint": "Permanently delete “{{name}}” together with its memories, skills, growth progress and chat history.",
     "delete": "Delete companion",
@@ -202,11 +200,41 @@
     "submit": "Create",
     "created": "{{name}} has arrived!",
     "failed": "Failed to create",
-    "hint": "Name and character are all it takes; models, memories and knowledge bases can be filled in later on the desktop. Custom figures are made on the desktop."
+    "hint": "After creating it, configure models, add memories and start chatting here. Set up knowledge bases and custom figures on the desktop."
   },
   "detail": {
     "loadFailed": "Failed to load this companion",
     "notFound": "Companion not found",
-    "notFoundHint": "It may have been deleted — go back to the roster."
+    "notFoundHint": "It may have been deleted — go back to the roster.",
+    "refreshFailed": "Could not refresh. Showing the last confirmed settings."
+  },
+  "modelSettings": {
+    "slots": {
+      "model": "Main chat",
+      "fallback_model": "Fallback",
+      "vision_model": "Vision",
+      "asr": "Speech recognition",
+      "tts": "Text to speech",
+      "learn": "Learning model",
+      "evolve": "Evolution model"
+    },
+    "hints": {
+      "model": "Sets the companion default for newly created sessions. Change an existing session model from its chat page.",
+      "fallback_model": "Select a dedicated fallback chat model for this companion, or clear the selection.",
+      "vision_model": "Used for independent image understanding. When unset, the main chat model is used if its protocol supports images.",
+      "asr": "Override speech recognition for this companion. Clear to follow the global speech recognition settings.",
+      "tts": "Override text to speech and voice for this companion. Clear to follow the global text to speech settings.",
+      "learn": "Used for companion learning, independently of the main chat model.",
+      "evolve": "Used for companion skill evolution, independently of the main chat model."
+    },
+    "defaultHint": "These are the companion defaults. Change the model of an existing session from its chat page.",
+    "configure": "Configure {{model}}",
+    "manageModels": "Manage models",
+    "followGlobal": "Follow global settings",
+    "followMain": "Follow main model capabilities",
+    "clear": "Clear selection",
+    "voice": "Voice: {{voice}}",
+    "defaultVoice": "Provider default",
+    "unavailable": "Unavailable"
   }
 }

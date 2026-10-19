@@ -14,7 +14,6 @@
  *   after creation.
  */
 import { api } from '@/api/client';
-import { orderSelectorProviders } from '@/features/models/selectors';
 
 import {
   normalizeChannelPluginStatus,
@@ -24,11 +23,9 @@ import {
   normalizeCsMessage,
   normalizeCsNote,
   normalizeKnowledgeBase,
-  normalizeProvider,
   buildAgentPatchBody,
 } from './normalize';
 import type {
-  CatalogModelRef,
   ChannelPluginStatus,
   CsAgent,
   CsAgentPatch,
@@ -37,7 +34,6 @@ import type {
   CsMessage,
   CsNote,
   KnowledgeBaseSummary,
-  ProviderSummary,
 } from './types';
 
 const asArray = (raw: unknown): unknown[] => (Array.isArray(raw) ? raw : []);
@@ -170,32 +166,6 @@ export async function listDialogueMessages(csDialogueId: string): Promise<CsMess
 export async function listKnowledgeBases(): Promise<KnowledgeBaseSummary[]> {
   const rows = await api<unknown>('/api/knowledge/bases');
   return asArray(rows).map(normalizeKnowledgeBase);
-}
-
-export async function listProviders(): Promise<ProviderSummary[]> {
-  const rows = await api<unknown>('/api/providers');
-  return orderSelectorProviders(
-    asArray(rows)
-    .map(normalizeProvider)
-    .filter((provider) => provider.enabled),
-  );
-}
-
-/** Authoritative chat-capable (provider, model) catalog. */
-export async function resolveChatModels(): Promise<CatalogModelRef[]> {
-  const providers = await listProviders();
-  return providers.flatMap((provider) =>
-    (provider.models ?? [])
-      .filter(
-        (model) =>
-          model.enabled === true &&
-          model.capabilities.some((capability) => capability.task === 'chat'),
-      )
-      .map((model) => ({
-        provider_id: provider.provider_id,
-        model: model.model,
-      })),
-  );
 }
 
 /** All channel bots; the CS pool is filtered client-side by owner_domain. */

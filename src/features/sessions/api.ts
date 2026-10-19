@@ -38,7 +38,7 @@ export interface ConversationRuntime {
 }
 
 export interface ConversationExtra {
-  /** A companion's single per-companion session (desktop 单会话契约). */
+  /** A canonical Session belonging to a companion; companions can own several. */
   companion_session?: boolean | number;
   companion_id?: string;
   summon?: { companion_id?: string; summoned_at?: number };

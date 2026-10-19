@@ -1,25 +1,23 @@
 /**
  * 总览 — read-and-monitor first: who this companion is, how far it has come, what
  * it remembers and knows, plus the one primary action (打开聊天) and a manual
- * learn pass. Everything that needs a desktop dialog (models, figure, knowledge
- * bases, robot pairing) is shown read-only with a "do it on the desktop" hint.
+ * learn pass. Model settings use the same profile API as the desktop.
  */
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, Card, SectionTitle, Tag, toast } from '@/components/ui';
+import { Button, Card, Notice, SectionTitle, Tag, toast } from '@/components/ui';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useProviders } from '@/features/models/hooks';
-import { providerModelRefLabel } from '@/features/models/presentation';
+import { connectionStore } from '@/api/connection';
 
 import { ensureCompanionThread, runLearnPass } from '../api';
 import { useCompanionExtras } from '../hooks';
 import { pushConversation } from '../navigation';
-import type { CompanionWithStatus } from '../types';
+import type { CompanionProfilePatch, CompanionWithStatus } from '../types';
 import {
   MOOD_VISUALS,
   ROBOT_PHASE_TONES,
@@ -32,12 +30,15 @@ import { CompanionFigure } from './companion-figure';
 import { LevelBar } from './level-bar';
 import { DesktopHint, InfoRow, StatCell } from './rows';
 import { SkillsCard } from './skills-card';
+import { ModelsCard } from './models-card';
 
 interface OverviewTabProps {
   companion: CompanionWithStatus;
   learning: boolean;
   setLearning: (value: boolean) => void;
   refreshProfile: () => Promise<unknown>;
+  saveProfile: (patch: CompanionProfilePatch) => Promise<void>;
+  profileSaving: boolean;
 }
 
 export function OverviewTab({
@@ -45,17 +46,18 @@ export function OverviewTab({
   learning,
   setLearning,
   refreshProfile,
+  saveProfile,
+  profileSaving,
 }: OverviewTabProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('companions');
-  const { providers } = useProviders('selector');
-  const modelLabel = (ref: Parameters<typeof providerModelRefLabel>[1]) => providerModelRefLabel(providers, ref);
 
   const companionId = companion.companion_id;
   const status = companion.status;
   const extras = useCompanionExtras(companionId);
   const [refreshing, setRefreshing] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -70,22 +72,24 @@ export function OverviewTab({
 
   const mood = moodOf(status?.mood);
   const character = characterOf(companion.character);
-  const modelReady = !!status?.model_configured;
+  const modelReady = !!companion.model;
 
   const openChat = () => {
-    if (!modelReady) {
-      toast.info(t('overview.chatModelMissingBody'));
-      return;
-    }
+    if (chatBusy) return;
+    setChatError('');
     setChatBusy(true);
+    const epoch = connectionStore.epoch();
     void (async () => {
       try {
-        // Idempotent ensure: returns the companion's single canonical conversation.
+        // Reuse the desktop receive Session, or create it from current defaults.
         const thread = await ensureCompanionThread(companionId);
+        if (connectionStore.epoch() !== epoch) return;
         pushConversation(thread.conversation_id);
-      } catch {
-        // The only expected failure is "no chat model configured" (400).
-        toast.info(t('overview.chatModelMissingBody'));
+      } catch (error) {
+        if (connectionStore.epoch() !== epoch) return;
+        const message = error instanceof Error ? error.message : t('overview.chatFailed');
+        setChatError(message);
+        toast.error(message);
       } finally {
         setChatBusy(false);
       }
@@ -95,12 +99,23 @@ export function OverviewTab({
   const runLearn = () => {
     if (learning) return;
     setLearning(true);
+    const epoch = connectionStore.epoch();
     void (async () => {
       try {
         const result = await runLearnPass(companionId);
-        toast.success(t('overview.learnDone', { count: result.memories_added ?? 0 }));
+        if (connectionStore.epoch() !== epoch) return;
+        if (result.status === 'ok') {
+          toast.success(t('overview.learnDone', { count: result.memories_added }));
+        } else if (result.status === 'model_unconfigured') {
+          toast.info(t('overview.learnModelMissing'));
+        } else if (result.status === 'no_events') {
+          toast.info(t('overview.learnNoEvents'));
+        } else {
+          toast.error(result.error || t('overview.learnFailed'));
+        }
         await Promise.all([refreshProfile(), extras.revalidate()]);
       } catch (err) {
+        if (connectionStore.epoch() !== epoch) return;
         toast.error(err instanceof Error ? err.message : t('overview.learnFailed'));
       } finally {
         setLearning(false);
@@ -151,9 +166,10 @@ export function OverviewTab({
 
         <LevelBar xp={status?.xp ?? 0} />
 
-        <Button onPress={openChat} loading={chatBusy} disabled={!modelReady}>
+        <Button onPress={openChat} loading={chatBusy}>
           {t('overview.openChat')}
         </Button>
+        {chatError ? <Notice tone="danger">{chatError}</Notice> : null}
         {!modelReady ? (
           <View style={[styles.warning, { backgroundColor: colors.warningSoft }]}>
             <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
@@ -203,30 +219,7 @@ export function OverviewTab({
         <DesktopHint text={t('overview.learnHint')} />
       </Card>
 
-      <SectionTitle>{t('overview.modelsTitle')}</SectionTitle>
-      <Card style={styles.card}>
-        <InfoRow
-          label={t('overview.modelMain')}
-          value={modelLabel(companion.model) ?? t('overview.modelUnset')}
-          muted={!companion.model}
-        />
-        <InfoRow
-          label={t('overview.modelFallback')}
-          value={modelLabel(companion.fallback_model) ?? t('overview.modelUnset')}
-          muted={!companion.fallback_model}
-        />
-        <InfoRow
-          label={t('overview.modelVision')}
-          value={modelLabel(companion.vision_model) ?? t('overview.modelUnset')}
-          muted={!companion.vision_model}
-        />
-        <InfoRow
-          label={t('overview.modelTts')}
-          value={modelLabel(companion.voice?.tts) ?? t('overview.modelUnset')}
-          muted={!companion.voice?.tts}
-        />
-        <DesktopHint text={t('overview.modelsHint')} />
-      </Card>
+      <ModelsCard key={companionId} companion={companion} saveProfile={saveProfile} saving={profileSaving} />
 
       <SkillsCard skills={extras.skills} error={extras.skillsError} decide={extras.decideSkill} />
 

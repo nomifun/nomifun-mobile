@@ -26,7 +26,7 @@
     "unknownProvider": "未知供应商",
     "unavailableTag": "不可用",
     "staleWarning": "已保存的模型当前不可用（供应商或模型被停用、删除），请重新选择。",
-    "noCandidates": "没有可用于对话的模型",
+    "noCandidates": "没有符合条件的模型",
     "noCandidatesHint": "请先启用一个供应商，并确认它至少有一个已启用的模型。",
     "catalogUnresolved": "模型清单读取失败，当前设置已保留。",
     "clear": "清除默认模型",
