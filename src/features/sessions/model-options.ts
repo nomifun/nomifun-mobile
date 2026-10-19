@@ -3,38 +3,35 @@
  * `model-switch.ts` so the pure grouping logic stays importable by `bun test`
  * without dragging react-native in.
  */
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
-import { useProviders, useTaskModels } from '@/features/models/hooks';
+import { useProviders } from '@/features/models/hooks';
+import { usableModelRefs } from '@/features/models/selectors';
 
 import type { Conversation } from './api';
 import { buildModelGroups, currentModelRef } from './model-switch';
 
 /** Grouped chat-capable models + the current binding, ready for the picker. */
 export function useModelOptions(conversation: Conversation | undefined, enabled: boolean) {
-  const task = useTaskModels('chat', enabled);
-  // `useProviders` has no enable switch; the key is shared with the models
-  // screen so an already-cached list costs nothing here.
   const providers = useProviders('selector');
   const current = currentModelRef(conversation);
 
   const groups = useMemo(
-    () => buildModelGroups(task.candidates, providers.providers, current),
-    [task.candidates, providers.providers, current],
+    () => buildModelGroups(
+      enabled && providers.providers ? usableModelRefs(providers.providers, 'chat') : [],
+      providers.providers,
+      current,
+    ),
+    [enabled, providers.providers, current],
   );
-
-  const refresh = useCallback(() => {
-    task.refresh();
-    providers.refresh();
-  }, [task, providers]);
 
   return {
     groups,
     current,
-    isLoading: task.isLoading || providers.isLoading,
+    isLoading: providers.isLoading,
     /** Catalog unreadable — must not be presented as "no models available". */
-    unresolved: task.unresolved || (!!providers.error && !providers.providers),
-    error: task.error ?? providers.error,
-    refresh,
+    unresolved: !!providers.error && !providers.providers,
+    error: providers.error,
+    refresh: providers.refresh,
   };
 }

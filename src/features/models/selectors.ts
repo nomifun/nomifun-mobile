@@ -80,25 +80,6 @@ export function isUsableModelRef(
   return !!model && model.enabled === true && modelSupportsTask(model, task, requiredTraits, requiredTechnicalCapabilities);
 }
 
-/** Pick the first runnable model in provider/model API order. */
-export function firstUsableModel(
-  providers: readonly ProviderResponse[],
-  task: ModelTask,
-  requiredTraits: readonly ModelTrait[] = [],
-  requiredTechnicalCapabilities: readonly ModelTechnicalCapability[] = [],
-): ModelRef | undefined {
-  for (const provider of orderSelectorProviders(providers)) {
-    if (provider.enabled === false) continue;
-    const model = provider.models.find(
-      (item) => item.enabled === true && modelSupportsTask(item, task, requiredTraits, requiredTechnicalCapabilities),
-    );
-    if (model) {
-      return { provider_id: provider.provider_id, model: model.model };
-    }
-  }
-  return undefined;
-}
-
 /** Flatten the runnable graph while preserving provider/model response order. */
 export function usableModelRefs(
   providers: readonly ProviderResponse[],

@@ -18,8 +18,6 @@ interface ModelSheetProps {
   visible: boolean;
   conversation: Conversation | undefined;
   onClose: () => void;
-  /** Called after a successful PATCH so the caller can refetch the row. */
-  onChanged: () => void;
 }
 
 type Row =
@@ -32,7 +30,7 @@ type Row =
  * one takes effect from the next message — the footer says so rather than
  * pretending it applies retroactively.
  */
-export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelSheetProps) {
+export function ModelSheet({ visible, conversation, onClose }: ModelSheetProps) {
   const { colors } = useTheme();
   const { t } = useTranslation('sessions');
   const { t: tc } = useTranslation('common');
@@ -62,7 +60,6 @@ export function ModelSheet({ visible, conversation, onClose, onChanged }: ModelS
         model,
       });
       if (!sessions.isCurrent()) return;
-      onChanged();
       onClose();
       toast.success(t('model.switched', { model: group.labels?.[model] ?? model }));
     } catch (error) {

@@ -1,7 +1,5 @@
 import type { RequestOptions } from '@/api/transport-client';
-import { ApiError, AuthExpiredError, StaleConnectionError } from '@/api/types';
-import type { ModelRef, ProviderResponse } from '@/features/models/types';
-import { firstUsableModel, isUsableModelRef } from '@/features/models/selectors';
+import { ApiError, StaleConnectionError } from '@/api/types';
 import { resolveRequiredResourceSelections } from './resource-selections';
 import { createdConversationId } from './wire';
 
@@ -58,12 +56,6 @@ export function createConversationCommand(request: SessionRequest, currentEpoch:
       assertCurrent();
       return result;
     };
-    const rethrowTerminal = (error: unknown) => {
-      assertCurrent();
-      if (error instanceof StaleConnectionError || error instanceof AuthExpiredError ||
-        (error instanceof ApiError && error.code === 'INVALID_API_RESPONSE')) throw error;
-    };
-
     assertCurrent();
     if (typeof idempotencyKey !== 'string' || !/^[\x21-\x7e]+$/.test(idempotencyKey)) {
       throw new ApiError('A session creation intent requires a visible ASCII idempotency key', 400, 'INVALID_IDEMPOTENCY_KEY');
@@ -71,28 +63,6 @@ export function createConversationCommand(request: SessionRequest, currentEpoch:
     const previous = prepared.get(intentKey);
     if (previous && previous.signature !== signature) throw changedIntent();
     const prepare = async (): Promise<Record<string, unknown>> => {
-      let model: ModelRef | undefined;
-      try {
-        const settings = await send<Record<string, unknown>>('/api/settings/client');
-        const raw = settings?.['nomi.defaultModel'];
-        if (raw && typeof raw === 'object') {
-          const { provider_id, model: modelName } = raw as Record<string, unknown>;
-          if (typeof provider_id === 'string' && provider_id && typeof modelName === 'string' && modelName) {
-            model = { provider_id, model: modelName };
-          }
-        }
-      } catch (error) {
-        rethrowTerminal(error);
-      }
-      try {
-        const providers = await send<ProviderResponse[]>('/api/providers');
-        if (!isUsableModelRef(providers, model, 'chat')) model = firstUsableModel(providers, 'chat');
-      } catch (error) {
-        // A transient catalog failure can retain a saved model, but cannot move
-        // the command to another connection or conceal a broken API contract.
-        rethrowTerminal(error);
-      }
-
       const library = await send<AgentPresetLibrary>('/api/agent-preset-templates?source=official');
       const templates = library.official_templates ?? [];
       const template = templates.find(value => value.template_key === CHAT_TEMPLATE_KEYS[0]) ??
@@ -105,11 +75,11 @@ export function createConversationCommand(request: SessionRequest, currentEpoch:
           kinds: resources.missingKinds,
         });
       }
+      // The desktop owns model inheritance, including an authored empty default.
       const editor = await send<AgentPresetEditorResponse>(
         `/api/agent-presets/from-template/${encodeURIComponent(template.template_key)}`,
         { body: {
-          display_name: 'Nomi', model_route_refs: {}, chat_route_records: {}, reuse_existing: true,
-          ...(model ? { model: { provider_id: model.provider_id, model: model.model } } : {}),
+          display_name: 'Nomi', reuse_existing: true,
         } },
       );
       const presetId = editor.preset?.preset_id;
@@ -118,7 +88,6 @@ export function createConversationCommand(request: SessionRequest, currentEpoch:
       return {
         preset_id: presetId,
         ...(name ? { title: name } : {}),
-        ...(model ? { model: { provider_id: model.provider_id, model: model.model } } : {}),
         ...(resources.selections.length ? { resource_selections: resources.selections } : {}),
         ...(workspace ? { workspace } : {}),
       };

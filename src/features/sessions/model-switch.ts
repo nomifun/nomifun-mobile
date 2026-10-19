@@ -16,14 +16,6 @@ import { modelDisplayLabel, modelRefLabel } from '@/features/models/presentation
 
 import type { Conversation, WireModel } from './api';
 
-export interface ModelOption {
-  providerId: string;
-  providerName: string;
-  /** Managed providers (NomiFun free models) are labelled and never editable upstream. */
-  managed: boolean;
-  model: string;
-}
-
 export interface ModelGroup {
   providerId: string;
   providerName: string;

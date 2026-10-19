@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
-  firstUsableModel,
   isUsableModelRef,
   modelSupportsTask,
   orderSelectorProviders,
@@ -113,10 +112,6 @@ describe('runtime model selectors', () => {
     expect(usableModelRefs([disabled, enabled], 'chat')).toEqual([
       { provider_id: 'enabled', model: 'ready' },
     ]);
-    expect(firstUsableModel([disabled, enabled], 'chat')).toEqual({
-      provider_id: 'enabled',
-      model: 'ready',
-    });
   });
 
   test('puts managed providers last but preserves API order within groups', () => {

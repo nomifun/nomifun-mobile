@@ -83,6 +83,25 @@ Browser acceptance must check that a known created Session returns to the list,
 remains after manual refresh and reload, appears once, and has no permanent
 "loading more" indicator. A load-error message is not a settled success state.
 
+The model lifecycle regression uses the current backend source in the adjacent
+`nomifun-tauri` checkout:
+
+```sh
+cargo test --offline --locked -p nomifun-app --no-default-features --test session_model_lifecycle -- --test-threads=1
+```
+
+Run that command from the backend checkout. It creates an isolated SQLite database
+and a local scripted provider: create a Session before configuring any model,
+configure a provider, bind the first model to the same Session, send a real Turn,
+reopen the database, and send another Turn with canonical prior context. It also
+checks frozen resources and non-model contracts, rejected selections, exact
+reselection, and explicit/automatic repair of incompatible reasoning overrides.
+The Store regression injects a SQLite write rejection and verifies that model and
+reasoning changes roll back together. Mobile `session-data.test.ts` separately
+checks that rejected commands preserve the entity, detail-read errors and ongoing
+reads, and that a later selection succeeds. These checks do not replace native
+device acceptance.
+
 Connection changes have a focused offline gate:
 
 ```sh

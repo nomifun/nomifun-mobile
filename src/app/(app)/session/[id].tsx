@@ -178,7 +178,6 @@ export default function SessionDetailScreen() {
       disabledHint={t('detail.cannotSend')}
       attachments={attachments}
       conversation={conversation.data}
-      onModelChanged={() => void conversation.mutate()}
       onSend={handleSend}
       onStop={handleStop}
     />

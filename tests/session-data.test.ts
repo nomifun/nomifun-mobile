@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { ApiError, StaleConnectionError } from '@/api/types';
+import { ApiError, AuthExpiredError, StaleConnectionError } from '@/api/types';
 import type { Conversation, Paginated, SessionReadOptions } from '@/features/sessions/api';
 import type { CreatedConversation } from '@/features/sessions/commands';
 import { createSessionData, type SessionDataOptions } from '@/features/sessions/data';
@@ -206,6 +206,81 @@ describe('connection-owned Session data', () => {
     client.data.dispose();
   });
 
+  it('keeps a rejected model selection local to its caller and accepts a later selection', async () => {
+    const client = fixture([row('session', { model: null, runtime: { can_send_message: true } })]);
+    await client.data.refresh();
+    await client.data.reloadDetail('session');
+    const before = client.data.getSnapshot();
+    const failure = new ApiError('Model selection refused', 409, 'CONFLICT');
+    const commitModel = client.deps.setModel;
+    client.deps.setModel = async () => { throw failure; };
+
+    expect(await client.data.setModel('session', { providerId: 'provider', model: 'model-a' }).catch(error => error)).toBe(failure);
+    expect(client.data.getSnapshot()).toBe(before);
+    expect(client.data.getSnapshot().details.session?.error).toBeUndefined();
+    expect(client.data.getSnapshot().entities.session?.model).toBeNull();
+
+    client.deps.setModel = commitModel;
+    await client.data.setModel('session', { providerId: 'provider', model: 'model-b' });
+    expect(client.data.getSnapshot().entities.session?.model).toEqual({ provider_id: 'provider', model: 'model-b' });
+    client.data.dispose();
+  });
+
+  it('preserves an existing detail read failure when a command is rejected', async () => {
+    const client = fixture([row('session')]);
+    await client.data.refresh();
+    const readFailure = new Error('Detail read unavailable');
+    client.deps.fetchOne = async () => { throw readFailure; };
+    await client.data.reloadDetail('session');
+    const before = client.data.getSnapshot();
+    const commandFailure = new ApiError('Model selection refused', 409, 'CONFLICT');
+    client.deps.setModel = async () => { throw commandFailure; };
+
+    expect(await client.data.setModel('session', { providerId: 'provider', model: 'model-b' }).catch(error => error)).toBe(commandFailure);
+    expect(client.data.getSnapshot()).toBe(before);
+    expect(client.data.getSnapshot().details.session?.error).toBe(readFailure);
+    client.data.dispose();
+  });
+
+  it('lets an in-flight detail read finish after a command is rejected', async () => {
+    const client = fixture([row('session')]);
+    await client.data.refresh();
+    const response = deferred<Conversation>();
+    let signal: AbortSignal | undefined;
+    client.deps.fetchOne = async (_id, options) => { signal = options.signal; return response.promise; };
+    const reading = client.data.reloadDetail('session');
+    await flush();
+    const before = client.data.getSnapshot();
+    const failure = new ApiError('Model selection refused', 409, 'CONFLICT');
+    client.deps.setModel = async () => { throw failure; };
+
+    expect(await client.data.setModel('session', { providerId: 'provider', model: 'model-b' }).catch(error => error)).toBe(failure);
+    expect(client.data.getSnapshot()).toBe(before);
+    expect(client.data.getSnapshot().details.session?.loading).toBe(true);
+    expect(signal?.aborted).toBe(false);
+
+    const canonical = row('session', { name: 'Latest projection' });
+    response.resolve(canonical);
+    expect(await reading).toBe(canonical);
+    expect(client.data.getSnapshot().entities.session).toBe(canonical);
+    expect(client.data.getSnapshot().details.session).toEqual({ loading: false, error: undefined });
+    client.data.dispose();
+  });
+
+  it('propagates authentication and stale-connection command failures without changing detail state', async () => {
+    for (const failure of [new AuthExpiredError(), new StaleConnectionError()]) {
+      const client = fixture([row('session')]);
+      await client.data.refresh();
+      await client.data.reloadDetail('session');
+      const before = client.data.getSnapshot();
+      client.deps.setModel = async () => { throw failure; };
+
+      expect(await client.data.setModel('session', { providerId: 'provider', model: 'model-b' }).catch(error => error)).toBe(failure);
+      expect(client.data.getSnapshot()).toBe(before);
+      client.data.dispose();
+    }
+  });
+
   it('reconciles the list and exactly the active detail subscriptions', async () => {
     const client = fixture([row('__proto__'), row('active'), row('inactive')]);
     await client.data.refresh();
@@ -243,8 +318,8 @@ describe('connection-owned Session data', () => {
     client.data.dispose();
   });
 
-  it('fences every in-flight creation, detail, and metadata continuation on a connection change', async () => {
-    for (const operation of ['create', 'detail', 'patch'] as const) {
+  it('fences every in-flight creation, detail, metadata, and model continuation on a connection change', async () => {
+    for (const operation of ['create', 'detail', 'patch', 'setModel'] as const) {
       const client = fixture([row('session')]);
       await client.data.refresh();
       const result = deferred<Conversation>();
@@ -254,8 +329,11 @@ describe('connection-owned Session data', () => {
       client.deps.create = async () => created.promise;
       let observed: SessionReadOptions | undefined;
       if (operation === 'patch') client.deps.patch = async (_id, _updates, request) => { observed = request; return result.promise; };
+      if (operation === 'setModel') client.deps.setModel = async (_id, _selection, request) => { observed = request; return result.promise; };
       const pending = operation === 'create' ? client.data.create('Created') : operation === 'detail'
-        ? client.data.reloadDetail('session') : client.data.patch('session', { name: 'New' });
+        ? client.data.reloadDetail('session') : operation === 'patch'
+          ? client.data.patch('session', { name: 'New' })
+          : client.data.setModel('session', { providerId: 'provider', model: 'model-b' });
       const settled = pending.catch(error => error);
       await flush();
       const before = client.data.getSnapshot();

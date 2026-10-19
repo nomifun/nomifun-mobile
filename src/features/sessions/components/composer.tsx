@@ -62,7 +62,6 @@ interface ComposerProps {
   attachments?: AttachmentsState;
   /** Drives the model chip; omit to hide model switching. */
   conversation?: Conversation;
-  onModelChanged?: () => void;
   /** Resolve `false` to keep the text in the box (failed send). */
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
@@ -76,7 +75,6 @@ export function Composer({
   hintWhileStreaming,
   attachments,
   conversation,
-  onModelChanged,
   onSend,
   onStop,
 }: ComposerProps) {
@@ -325,7 +323,6 @@ export function Composer({
           visible={modelSheet}
           conversation={conversation}
           onClose={() => setModelSheet(false)}
-          onChanged={() => onModelChanged?.()}
         />
       ) : null}
     </View>

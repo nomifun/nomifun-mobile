@@ -149,6 +149,8 @@ export function createSessionData(options: SessionDataOptions): SessionData {
       assertCurrent();
       const abort = new AbortController();
       mutationAborts.add(abort);
+      // Only a committed command supersedes detail reads. Rejections propagate
+      // to the caller without changing the entity or an existing read/error.
       try {
         const row = await command({ expectedEpoch: options.epoch, signal: abort.signal });
         assertCurrent();
@@ -157,9 +159,6 @@ export function createSessionData(options: SessionDataOptions): SessionData {
         else catalog.remove(id);
         pendingCreated.delete(id);
         setDetail(id, false, undefined);
-      } catch (error) {
-        if (isCurrent()) setDetail(id, false, error);
-        throw error;
       } finally {
         mutationAborts.delete(abort);
       }
